@@ -1,4 +1,4 @@
-"""合并七套题数据 -> questions_full.json（含 sets 元数据）。"""
+"""合并九套题数据 -> questions_full.json（含 sets 元数据）。"""
 import json, os, shutil, hashlib
 
 BASE = "/home/hatch/workspace/quizapp"
@@ -63,6 +63,10 @@ set6 = build_set("s6", "questions_set6.json", "img6",
                  {n: q for (s, n), q in existing_by_set_n.items() if s == "s6"})
 set7 = build_set("s7", "questions_set7.json", "img7",
                  {n: q for (s, n), q in existing_by_set_n.items() if s == "s7"})
+set8 = build_set("s8", "ocr_work/questions_set8.json", "img8",
+                 {n: q for (s, n), q in existing_by_set_n.items() if s == "s8"})
+set9 = build_set("s9", "ocr_work/questions_set9.json", "img9",
+                 {n: q for (s, n), q in existing_by_set_n.items() if s == "s9"})
 
 subjects = [
     {"id": "fagui", "title": "法规", "desc": "安全生产法律法规"},
@@ -92,8 +96,12 @@ sets = [
      "desc": "李天宇8套卷·第6套，模考大赛班。"},
     {"id": "s7", "subject": "jishu", "title": "技术李第7套", "kicker": "模考金题",
      "desc": "第01讲 模考金题一（一）。"},
+    {"id": "s8", "subject": "jishu", "title": "技术顺利1套", "kicker": "顺利押题",
+     "desc": "注安技术顺利押题1。"},
+    {"id": "s9", "subject": "jishu", "title": "技术顺利2套", "kicker": "顺利押题",
+     "desc": "注安技术顺利押题2。"},
 ]
-out = {"subjects": subjects, "sets": sets, "questions": set2 + set3 + set4 + set1 + set5 + set6 + set7}
+out = {"subjects": subjects, "sets": sets, "questions": set2 + set3 + set4 + set1 + set5 + set6 + set7 + set8 + set9}
 with open(os.path.join(BASE, "questions_full.json"), "w", encoding="utf-8") as f:
     json.dump(out, f, ensure_ascii=False)
 for s in sets:
@@ -107,3 +115,5 @@ print("img4 文件数:", len(os.listdir(os.path.join(www, "img4"))))
 print("img5 文件数:", len(os.listdir(os.path.join(www, "img5"))))
 print("img6 文件数:", len(os.listdir(os.path.join(www, "img6"))))
 print("img7 文件数:", len(os.listdir(os.path.join(www, "img7"))))
+print("img8 文件数:", len(os.listdir(os.path.join(www, "img8"))))
+print("img9 文件数:", len(os.listdir(os.path.join(www, "img9"))))
