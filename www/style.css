@@ -22,6 +22,7 @@ body{background:#131417;color:#e8e6e1;font-family:-apple-system,BlinkMacSystemFo
 .card-go{color:#5a5d65;font-size:24px;line-height:1}
 .card.disabled{opacity:.4}
 .foot{text-align:center;color:#6a6d75;font-size:12px;margin-top:28px;line-height:1.8}
+.disclaimer{color:#54575e;font-size:11px}
 .qbar{display:flex;align-items:center;gap:10px;margin-bottom:14px}
 #q-back{background:none;border:none;color:#c9a24b;font-size:15px;cursor:pointer;font-family:inherit;padding:4px}
 .qprog{flex:1;height:6px;background:#26282e;border-radius:3px;overflow:hidden;cursor:pointer;touch-action:none;position:relative}
