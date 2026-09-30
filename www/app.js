@@ -238,4 +238,16 @@ $('#auth-submit').onclick = async () => {
 };
 $('#auth-password').addEventListener('keydown', e => { if (e.key === 'Enter') $('#auth-submit').click(); });
 
+// 答题字号调节（15/17/19/21 四档，记住选择）
+const FS_LEVELS = [15, 17, 19, 21];
+let fsIdx = FS_LEVELS.indexOf(parseInt(localStorage.getItem('qfs') || '17', 10));
+if (fsIdx < 0) fsIdx = 1;
+function applyFs() {
+  document.documentElement.style.setProperty('--qfs', FS_LEVELS[fsIdx] + 'px');
+  localStorage.setItem('qfs', String(FS_LEVELS[fsIdx]));
+}
+$('#fs-dec').onclick = () => { if (fsIdx > 0) { fsIdx--; applyFs(); } };
+$('#fs-inc').onclick = () => { if (fsIdx < FS_LEVELS.length - 1) { fsIdx++; applyFs(); } };
+applyFs();
+
 loadHome().catch(e => { $('#set-desc').textContent = '服务连接失败，请稍后重试'; });
