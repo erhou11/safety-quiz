@@ -65,22 +65,23 @@ set7 = build_set("s7", "questions_set7.json", "img7",
                  {n: q for (s, n), q in existing_by_set_n.items() if s == "s7"})
 
 sets = [
-    {"id": "s1", "title": "2026 点题锁分班 · 第4套", "kicker": "2026 点题锁分班",
-     "desc": "覆盖机械安全、电气安全、危险化学品与防火防爆等重点。选择答案后立即核对，并结合解析巩固考点。"},
-    {"id": "s2", "title": "安全技术基础阶段评测一", "kicker": "2026 阶段评测",
-     "desc": "按 2025 真题难度呈现，知识点覆盖全面，陷阱题型典型，适合考前重复练习。"},
-    {"id": "s3", "title": "安全技术基础阶段评测二", "kicker": "2026 阶段评测",
-     "desc": "李天宇 8 套卷之二，难度对标真题，覆盖机械、电气、危化品等高频考点，适合刷题巩固。"},
-    {"id": "s4", "title": "2026 点题锁分班 · 第1套", "kicker": "2026 点题锁分班",
-     "desc": "点题锁分第 1 讲，机械安全与电气安全重点突出，题型紧扣考点，适合系统复习。"},
-    {"id": "s5", "title": "李天宇 8 套卷 · 第 5 套", "kicker": "2026 点题锁分班",
-     "desc": "点题锁分班（三），李天宇 8 套卷之五，题型紧贴考点，适合考前冲刺刷题。"},
-    {"id": "s6", "title": "李天宇 8 套卷 · 第 6 套", "kicker": "2026 模考大赛",
-     "desc": "模考大赛班，李天宇 8 套卷之六，全真模拟考试节奏，适合考前查漏补缺。"},
-    {"id": "s7", "title": "模考金题一 ·（一）", "kicker": "2026 模考金题",
-     "desc": "模考金题第 1 讲，精选高频考点与典型陷阱题，适合考前强化训练。"},
+    # 按"技术李第N套"统一编号，按课程进度排序
+    {"id": "s2", "title": "技术李第1套", "kicker": "阶段测评",
+     "desc": "第01讲 阶段测评一（一），基础阶段自测。"},
+    {"id": "s3", "title": "技术李第2套", "kicker": "阶段测评",
+     "desc": "李天宇8套卷·第2套，阶段测评班（二）。"},
+    {"id": "s4", "title": "技术李第3套", "kicker": "点题锁分",
+     "desc": "第01讲 点题锁分一（一）。"},
+    {"id": "s1", "title": "技术李第4套", "kicker": "点题锁分",
+     "desc": "第01讲 点题锁分一（四）。"},
+    {"id": "s5", "title": "技术李第5套", "kicker": "点题锁分",
+     "desc": "李天宇8套卷·第5套，点题锁分班（三）。"},
+    {"id": "s6", "title": "技术李第6套", "kicker": "模考大赛",
+     "desc": "李天宇8套卷·第6套，模考大赛班。"},
+    {"id": "s7", "title": "技术李第7套", "kicker": "模考金题",
+     "desc": "第01讲 模考金题一（一）。"},
 ]
-out = {"sets": sets, "questions": set1 + set2 + set3 + set4 + set5 + set6 + set7}
+out = {"sets": sets, "questions": set2 + set3 + set4 + set1 + set5 + set6 + set7}
 with open(os.path.join(BASE, "questions_full.json"), "w", encoding="utf-8") as f:
     json.dump(out, f, ensure_ascii=False)
 for s in sets:
