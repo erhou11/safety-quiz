@@ -1,6 +1,8 @@
 const $ = s => document.querySelector(s);
 const LETTERS = 'ABCDEFGH';
 let mode = 'seq', order = [], pos = 0, roundMap = {}, t0 = 0, picked = [];
+let curSet = localStorage.getItem('quiz_set') || 's1';
+let setsMeta = [];
 
 function show(id) {
   document.querySelectorAll('.screen').forEach(e => e.classList.remove('active'));
@@ -12,12 +14,43 @@ async function api(p, o = {}) {
   if (!r.ok) throw new Error('api ' + r.status);
   return r.json();
 }
+const withSet = (p, body) => {
+  if (body) { const b = JSON.parse(body); b.set = curSet; return JSON.stringify(b); }
+  return p + (p.includes('?') ? '&' : '?') + 'set=' + curSet;
+};
+
+function renderSetTabs() {
+  const box = $('#set-tabs'); box.innerHTML = '';
+  setsMeta.forEach(s => {
+    const b = document.createElement('button');
+    b.className = 'set-tab' + (s.id === curSet ? ' active' : '');
+    b.innerHTML = '<div class="st-k"></div><div class="st-t"></div><div class="st-c"></div>';
+    b.querySelector('.st-k').textContent = s.kicker;
+    b.querySelector('.st-t').textContent = s.title;
+    b.querySelector('.st-c').textContent = s.total + ' 题';
+    b.onclick = () => {
+      if (curSet === s.id) return;
+      curSet = s.id;
+      localStorage.setItem('quiz_set', curSet);
+      loadHome();
+    };
+    box.appendChild(b);
+  });
+}
 
 async function loadHome() {
-  const meta = await api('meta'), st = await api('state');
-  $('#st-total').textContent = meta.total;
-  $('#st-single').textContent = meta.single;
-  $('#st-multi').textContent = meta.multi;
+  const meta = await api('meta');
+  setsMeta = meta.sets;
+  if (!setsMeta.some(s => s.id === curSet)) curSet = setsMeta[0].id;
+  renderSetTabs();
+  const s = setsMeta.find(x => x.id === curSet);
+  $('#set-kicker').textContent = s.kicker;
+  $('#set-title').textContent = s.title;
+  $('#set-desc').textContent = s.desc;
+  $('#st-total').textContent = s.total;
+  $('#st-single').textContent = s.single;
+  $('#st-multi').textContent = s.multi;
+  const st = await api(withSet('state'));
   $('#seq-hint').textContent = st.seq_pos > 0 ? `上次做到第 ${st.seq_pos + 1} 题，点击继续` : '从第 1 题开始，完整练完一套';
   $('#rand-hint').textContent = st.rand_pos > 0 ? `上次做到第 ${st.rand_pos + 1} 题，点击继续` : '打乱顺序，随机抽题练习';
   $('#wrong-hint').textContent = st.wrong_count > 0 ? `共 ${st.wrong_count} 道错题，点击重练` : '答错的题目会自动收录在这里';
@@ -30,9 +63,9 @@ async function loadHome() {
 
 async function startQuiz(m, resumePos) {
   mode = m; t0 = Date.now(); picked = [];
-  order = await api('questions?mode=' + m);
+  order = await api(withSet('questions?mode=' + m));
   if (!order.length) return;
-  roundMap = await api('round');
+  roundMap = await api(withSet('round'));
   pos = Math.min(resumePos || 0, order.length - 1);
   show('quiz');
   renderQ();
@@ -67,7 +100,7 @@ async function renderQ() {
   $('#q-next').textContent = pos === order.length - 1 ? '完成' : '下一题';
   const fb = $('#q-feedback'); fb.classList.add('hidden'); fb.innerHTML = '';
   if (prev) showFeedback(q, prev);
-  api('visit', { method: 'POST', body: JSON.stringify({ mode, pos }) }).catch(() => {});
+  api('visit', { method: 'POST', body: withSet(null, JSON.stringify({ mode, pos })) }).catch(() => {});
 }
 
 function onPick(L) {
@@ -80,7 +113,7 @@ function onPick(L) {
 
 async function submit(sel) {
   const q = order[pos];
-  const r = await api('answer', { method: 'POST', body: JSON.stringify({ n: q.n, selected: sel, mode }) });
+  const r = await api('answer', { method: 'POST', body: withSet(null, JSON.stringify({ n: q.n, selected: sel, mode })) });
   roundMap[q.n] = { selected: sel, correct: r.correct, answer: r.answer, explanation: r.explanation, exp_images: r.exp_images };
   showFeedback(q, roundMap[q.n]);
 }
@@ -123,7 +156,7 @@ function finishRound() {
   $('#r-detail').textContent = `正确率 ${Math.round(ok / total * 100)}% · 用时约 ${mins} 分钟`;
   show('result');
 }
-$('#r-retry').onclick = async () => { await api('reset', { method: 'POST', body: JSON.stringify({ mode }) }); startQuiz(mode, 0); };
+$('#r-retry').onclick = async () => { await api('reset', { method: 'POST', body: withSet(null, JSON.stringify({ mode })) }); startQuiz(mode, 0); };
 $('#r-home').onclick = () => { show('home'); loadHome(); };
 
-loadHome().catch(e => { $('#seq-hint').textContent = '服务连接失败，请稍后重试'; });
+loadHome().catch(e => { $('#set-desc').textContent = '服务连接失败，请稍后重试'; });

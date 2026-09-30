@@ -61,3 +61,9 @@ body{background:#131417;color:#e8e6e1;font-family:-apple-system,BlinkMacSystemFo
 #r-detail{color:#9a978f;margin:10px 0 26px;font-size:14px}
 #screen-result .card{justify-content:center;text-align:center}
 #screen-result .card-body{flex:none}
+.sets{display:flex;gap:10px;margin-bottom:24px}
+.set-tab{flex:1;background:#1d1f24;border:1px solid #2a2d34;border-radius:12px;padding:12px;color:#e8e6e1;cursor:pointer;font-family:inherit;text-align:left;font-size:13px}
+.set-tab .st-k{color:#c9a24b;font-size:11px;letter-spacing:1px;margin-bottom:4px}
+.set-tab .st-t{font-weight:600;font-size:14px;margin-bottom:2px;line-height:1.4}
+.set-tab .st-c{color:#8a877f;font-size:12px}
+.set-tab.active{border-color:#c9a24b;background:#242219}
