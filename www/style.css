@@ -10,7 +10,7 @@ body{background:#131417;color:#e8e6e1;font-family:-apple-system,BlinkMacSystemFo
 .hero h1{font-size:20px;margin-bottom:14px;letter-spacing:1px}
 .desc{color:#9a978f;font-size:14px;line-height:1.7;margin-bottom:22px}
 .stats{display:flex;gap:30px;margin-bottom:26px}
-.stats b{display:block;font-size:30px}
+.stats b{display:block;font-size:20px}
 .stats span{color:#8a877f;font-size:12px}
 .cards{display:flex;flex-direction:column;gap:12px}
 .card{display:flex;align-items:center;gap:14px;background:#1d1f24;border:1px solid #2a2d34;border-radius:14px;padding:16px;text-align:left;color:#e8e6e1;width:100%;font-size:15px;cursor:pointer;font-family:inherit}
