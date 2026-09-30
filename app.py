@@ -70,6 +70,7 @@ def _rebuild_with_set(d, tbl, cols, pk):
 
 def init_db():
     d = db()
+    d.execute('PRAGMA journal_mode=WAL')
     d.executescript('''
     CREATE TABLE IF NOT EXISTS answers(
         client TEXT, set_id TEXT DEFAULT 's1', n INTEGER, selected TEXT, correct INTEGER,
