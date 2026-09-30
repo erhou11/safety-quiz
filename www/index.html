@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>安全生产技术刷题</title>
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="app">
+  <section id="screen-home" class="screen active">
+    <div class="hero">
+      <div class="kicker">2026 点题锁分班 · 第 4 套</div>
+      <h1>85 题，一套做完</h1>
+      <p class="desc">覆盖机械安全、电气安全、危险化学品与防火防爆等重点。选择答案后立即核对，并结合解析巩固考点。</p>
+      <div class="stats">
+        <div><b id="st-total">–</b><span>全套题目</span></div>
+        <div><b id="st-single">–</b><span>单选题</span></div>
+        <div><b id="st-multi">–</b><span>多选题</span></div>
+      </div>
+    </div>
+    <div class="cards">
+      <button class="card" id="btn-seq">
+        <div class="card-icon">序</div>
+        <div class="card-body"><div class="card-title">顺序练习</div><div class="card-sub" id="seq-hint">从第 1 题开始</div></div>
+        <div class="card-go">›</div>
+      </button>
+      <button class="card" id="btn-rand">
+        <div class="card-icon">随</div>
+        <div class="card-body"><div class="card-title">随机练习</div><div class="card-sub" id="rand-hint">打乱顺序抽题</div></div>
+        <div class="card-go">›</div>
+      </button>
+      <button class="card" id="btn-wrong">
+        <div class="card-icon">错</div>
+        <div class="card-body"><div class="card-title">错题本</div><div class="card-sub" id="wrong-hint">答错自动收录</div></div>
+        <div class="card-go">›</div>
+      </button>
+    </div>
+    <div class="foot">进度与错题保存在服务器，关掉重开接着来</div>
+  </section>
+
+  <section id="screen-quiz" class="screen">
+    <header class="qbar">
+      <button id="q-back">‹ 返回</button>
+      <div class="qprog"><div id="q-prog-fill"></div></div>
+      <div id="q-count">1/85</div>
+    </header>
+    <div class="qmeta"><span id="q-cat"></span><span id="q-type"></span></div>
+    <div class="qstem" id="q-stem"></div>
+    <div class="qimgs" id="q-imgs"></div>
+    <div class="qopts" id="q-opts"></div>
+    <button id="q-submit" class="submit hidden">提交答案</button>
+    <div id="q-feedback" class="feedback hidden"></div>
+    <nav class="qnav">
+      <button id="q-prev">上一题</button>
+      <button id="q-next">下一题</button>
+    </nav>
+  </section>
+
+  <section id="screen-result" class="screen">
+    <h2>本轮完成</h2>
+    <div class="score"><b id="r-score">–</b></div>
+    <p id="r-detail"></p>
+    <div class="cards">
+      <button class="card" id="r-retry"><div class="card-body"><div class="card-title">再来一轮</div></div><div class="card-go">›</div></button>
+      <button class="card" id="r-home"><div class="card-body"><div class="card-title">返回首页</div></div><div class="card-go">›</div></button>
+    </div>
+  </section>
+</div>
+<script src="app.js"></script>
+</body>
+</html>
