@@ -67,8 +67,14 @@ set7 = build_set("s7", "questions_set7.json", "img7",
 subjects = [
     {"id": "fagui", "title": "法规", "desc": "安全生产法律法规"},
     {"id": "guanli", "title": "管理", "desc": "安全生产管理"},
-    {"id": "jishu", "title": "技术", "desc": "安全生产技术"},
-    {"id": "huagong", "title": "化工", "desc": "化工安全"},
+    {"id": "jishu", "title": "技术", "desc": "安全生产技术基础"},
+    {"id": "meikuang", "title": "煤矿", "desc": "安全生产专业实务·煤矿安全"},
+    {"id": "kuangshan", "title": "矿山", "desc": "安全生产专业实务·金属非金属矿山安全"},
+    {"id": "huagong", "title": "化工", "desc": "安全生产专业实务·化工安全"},
+    {"id": "yelian", "title": "冶炼", "desc": "安全生产专业实务·金属冶炼安全"},
+    {"id": "jianzhu", "title": "建筑", "desc": "安全生产专业实务·建筑施工安全"},
+    {"id": "daolu", "title": "道路", "desc": "安全生产专业实务·道路运输安全"},
+    {"id": "qita", "title": "其他", "desc": "安全生产专业实务·其他安全"},
 ]
 sets = [
     # 按"技术李第N套"统一编号，按课程进度排序
