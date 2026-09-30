@@ -14,6 +14,7 @@ DB = os.path.join(DATA_DIR, 'quiz.db')
 with open(os.path.join(BASE, 'questions_full.json'), encoding='utf-8') as f:
     _data = json.load(f)
 SETS = _data['sets']
+SUBJECTS = _data.get('subjects', [])
 QUESTIONS = {}
 for q in _data['questions']:
     QUESTIONS['%s:%d' % (q['set'], q['n'])] = q
@@ -175,10 +176,11 @@ def meta():
     for s in SETS:
         qs = [q for q in QUESTIONS.values() if q['set'] == s['id']]
         out.append({'id': s['id'], 'title': s['title'], 'kicker': s['kicker'],
+                    'subject': s.get('subject', 'jishu'), 'desc': s.get('desc', ''),
                     'total': len(qs),
                     'single': sum(1 for q in qs if q['type'] == 'single'),
                     'multi': sum(1 for q in qs if q['type'] == 'multi')})
-    return jsonify({'sets': out})
+    return jsonify({'subjects': SUBJECTS, 'sets': out})
 
 
 @app.post('/api/register')

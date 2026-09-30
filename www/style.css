@@ -63,6 +63,14 @@ body{background:#131417;color:#e8e6e1;font-family:-apple-system,BlinkMacSystemFo
 #screen-result .card-body{flex:none}
 .sets{display:flex;gap:10px;margin-bottom:24px}
 .sets{display:flex;gap:10px;margin:4px 0 22px}
+.exam-brand{text-align:center;font-size:13px;letter-spacing:8px;color:#8a877f;margin-bottom:14px;text-indent:8px}
+.subjects{display:flex;gap:8px;margin-bottom:16px}
+.subj-tab{flex:1;background:#16181d;border:1px solid #2a2d34;border-radius:12px;padding:11px 4px;color:#e8e6e1;font-size:15px;cursor:pointer;font-family:inherit;transition:border-color .2s,background .2s}
+.subj-tab.active{border-color:#c9a24b;background:#26220f;color:#f0d47a;font-weight:700;box-shadow:0 0 0 1px #c9a24b}
+.empty{text-align:center;padding:64px 20px}
+.empty-icon{font-size:46px;margin-bottom:14px}
+.empty-title{font-size:18px;font-weight:700;color:#e8e6e1;margin-bottom:8px}
+.empty-sub{font-size:14px;color:#8a877f}
 .set-tab{flex:1;min-width:0;background:#1d1f24;border:1px solid #2a2d34;border-radius:14px;padding:14px 10px;color:#e8e6e1;cursor:pointer;font-family:inherit;text-align:center;font-size:13px;transition:border-color .2s,background .2s,box-shadow .2s,transform .1s}
 .set-tab:active{transform:scale(.98)}
 .set-tab .st-k{color:#c9a24b;font-size:11px;letter-spacing:2px;margin-bottom:6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}

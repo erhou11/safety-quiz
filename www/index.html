@@ -3,9 +3,9 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
-<title>安全生产技术刷题</title>
+<title>注册安全工程师刷题</title>
 <link rel="icon" href="data:,">
-<link rel="stylesheet" href="style.css?v=3">
+<link rel="stylesheet" href="style.css?v=4">
 </head>
 <body>
 <div id="app">
@@ -15,6 +15,8 @@
       <button id="btn-auth" class="link-btn">登录 / 注册</button>
       <button id="btn-logout" class="link-btn hidden">退出</button>
     </div>
+    <div class="exam-brand">注册安全工程师</div>
+    <div class="subjects" id="subject-tabs"></div>
     <div class="hero">
       <div class="sets" id="set-tabs"></div>
       <div class="kicker" id="set-kicker">–</div>
@@ -42,6 +44,11 @@
         <div class="card-body"><div class="card-title">错题本</div><div class="card-sub" id="wrong-hint">答错自动收录</div></div>
         <div class="card-go">›</div>
       </button>
+    </div>
+    <div id="subject-empty" class="empty hidden">
+      <div class="empty-icon">📚</div>
+      <div class="empty-title" id="empty-title">题库整理中</div>
+      <div class="empty-sub">该科目题目正在陆续上传，敬请期待</div>
     </div>
     <div class="foot">进度与错题保存在服务器，关掉重开接着来</div>
   </section>
@@ -89,6 +96,6 @@
     </div>
   </section>
 </div>
-<script src="app.js?v=3"></script>
+<script src="app.js?v=4"></script>
 </body>
 </html>

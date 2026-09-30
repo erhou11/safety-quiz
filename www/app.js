@@ -2,7 +2,9 @@ const $ = s => document.querySelector(s);
 const LETTERS = 'ABCDEFGH';
 let mode = 'seq', order = [], pos = 0, roundMap = {}, t0 = 0, picked = [];
 let curSet = localStorage.getItem('quiz_set') || 's1';
+let curSubject = localStorage.getItem('quiz_subject') || 'jishu';
 let setsMeta = [];
+let subjectsMeta = [];
 
 function show(id) {
   document.querySelectorAll('.screen').forEach(e => e.classList.remove('active'));
@@ -19,9 +21,32 @@ const withSet = (p, body) => {
   return p + (p.includes('?') ? '&' : '?') + 'set=' + curSet;
 };
 
+function subjectSets() {
+  return setsMeta.filter(s => s.subject === curSubject);
+}
+
+function renderSubjectTabs() {
+  const box = $('#subject-tabs'); box.innerHTML = '';
+  subjectsMeta.forEach(s => {
+    const b = document.createElement('button');
+    b.className = 'subj-tab' + (s.id === curSubject ? ' active' : '');
+    b.textContent = s.title;
+    b.onclick = () => {
+      if (curSubject === s.id) return;
+      curSubject = s.id;
+      localStorage.setItem('quiz_subject', curSubject);
+      const ss = subjectSets();
+      curSet = ss.length ? ss[0].id : null;
+      localStorage.setItem('quiz_set', curSet || '');
+      loadHome();
+    };
+    box.appendChild(b);
+  });
+}
+
 function renderSetTabs() {
   const box = $('#set-tabs'); box.innerHTML = '';
-  setsMeta.forEach(s => {
+  subjectSets().forEach(s => {
     const b = document.createElement('button');
     b.className = 'set-tab' + (s.id === curSet ? ' active' : '');
     b.innerHTML = '<div class="st-k"></div><div class="st-t"></div><div class="st-c"></div>';
@@ -41,9 +66,22 @@ function renderSetTabs() {
 async function loadHome() {
   loadMe().catch(() => {});
   const meta = await api('meta');
+  subjectsMeta = meta.subjects || [];
   setsMeta = meta.sets;
-  if (!setsMeta.some(s => s.id === curSet)) curSet = setsMeta[0].id;
+  if (!subjectsMeta.some(s => s.id === curSubject)) curSubject = (subjectsMeta[0] || {}).id || 'jishu';
+  renderSubjectTabs();
+  const ss = subjectSets();
+  if (!ss.some(s => s.id === curSet)) curSet = ss.length ? ss[0].id : null;
   renderSetTabs();
+  const subj = subjectsMeta.find(x => x.id === curSubject) || {};
+  const hasSets = ss.length > 0;
+  document.querySelector('.hero').classList.toggle('hidden', !hasSets);
+  document.querySelector('.cards').classList.toggle('hidden', !hasSets);
+  $('#subject-empty').classList.toggle('hidden', hasSets);
+  if (!hasSets) {
+    $('#empty-title').textContent = (subj.title || '') + '题库整理中';
+    return;
+  }
   const s = setsMeta.find(x => x.id === curSet);
   $('#set-kicker').textContent = s.kicker;
   $('#set-title').textContent = s.title;
@@ -179,7 +217,8 @@ function setAuthMode(m) {
 $('#btn-auth').onclick = () => { setAuthMode('login'); $('#auth-email').value = ''; $('#auth-password').value = ''; show('auth'); };
 $('#btn-logout').onclick = async () => {
   await api('logout', { method: 'POST' });
-  localStorage.removeItem('quiz_set'); curSet = 's1';
+  localStorage.removeItem('quiz_set'); localStorage.removeItem('quiz_subject');
+  curSubject = 'jishu'; curSet = null;
   loadHome();
 };
 $('#auth-back').onclick = () => { show('home'); };

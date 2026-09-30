@@ -64,24 +64,30 @@ set6 = build_set("s6", "questions_set6.json", "img6",
 set7 = build_set("s7", "questions_set7.json", "img7",
                  {n: q for (s, n), q in existing_by_set_n.items() if s == "s7"})
 
+subjects = [
+    {"id": "fagui", "title": "法规", "desc": "安全生产法律法规"},
+    {"id": "guanli", "title": "管理", "desc": "安全生产管理"},
+    {"id": "jishu", "title": "技术", "desc": "安全生产技术"},
+    {"id": "huagong", "title": "化工", "desc": "化工安全"},
+]
 sets = [
     # 按"技术李第N套"统一编号，按课程进度排序
-    {"id": "s2", "title": "技术李第1套", "kicker": "阶段测评",
+    {"id": "s2", "subject": "jishu", "title": "技术李第1套", "kicker": "阶段测评",
      "desc": "第01讲 阶段测评一（一），基础阶段自测。"},
-    {"id": "s3", "title": "技术李第2套", "kicker": "阶段测评",
+    {"id": "s3", "subject": "jishu", "title": "技术李第2套", "kicker": "阶段测评",
      "desc": "李天宇8套卷·第2套，阶段测评班（二）。"},
-    {"id": "s4", "title": "技术李第3套", "kicker": "点题锁分",
+    {"id": "s4", "subject": "jishu", "title": "技术李第3套", "kicker": "点题锁分",
      "desc": "第01讲 点题锁分一（一）。"},
-    {"id": "s1", "title": "技术李第4套", "kicker": "点题锁分",
+    {"id": "s1", "subject": "jishu", "title": "技术李第4套", "kicker": "点题锁分",
      "desc": "第01讲 点题锁分一（四）。"},
-    {"id": "s5", "title": "技术李第5套", "kicker": "点题锁分",
+    {"id": "s5", "subject": "jishu", "title": "技术李第5套", "kicker": "点题锁分",
      "desc": "李天宇8套卷·第5套，点题锁分班（三）。"},
-    {"id": "s6", "title": "技术李第6套", "kicker": "模考大赛",
+    {"id": "s6", "subject": "jishu", "title": "技术李第6套", "kicker": "模考大赛",
      "desc": "李天宇8套卷·第6套，模考大赛班。"},
-    {"id": "s7", "title": "技术李第7套", "kicker": "模考金题",
+    {"id": "s7", "subject": "jishu", "title": "技术李第7套", "kicker": "模考金题",
      "desc": "第01讲 模考金题一（一）。"},
 ]
-out = {"sets": sets, "questions": set2 + set3 + set4 + set1 + set5 + set6 + set7}
+out = {"subjects": subjects, "sets": sets, "questions": set2 + set3 + set4 + set1 + set5 + set6 + set7}
 with open(os.path.join(BASE, "questions_full.json"), "w", encoding="utf-8") as f:
     json.dump(out, f, ensure_ascii=False)
 for s in sets:
