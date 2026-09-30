@@ -1,4 +1,4 @@
-"""合并五套题数据 -> questions_full.json（含 sets 元数据）。"""
+"""合并六套题数据 -> questions_full.json（含 sets 元数据）。"""
 import json, os, shutil, hashlib
 
 BASE = "/home/hatch/workspace/quizapp"
@@ -59,6 +59,8 @@ set4 = build_set("s4", "questions_set4.json", "img4",
                  {n: q for (s, n), q in existing_by_set_n.items() if s == "s4"})
 set5 = build_set("s5", "questions_set5.json", "img5",
                  {n: q for (s, n), q in existing_by_set_n.items() if s == "s5"})
+set6 = build_set("s6", "questions_set6.json", "img6",
+                 {n: q for (s, n), q in existing_by_set_n.items() if s == "s6"})
 
 sets = [
     {"id": "s1", "title": "2026 点题锁分班 · 第4套", "kicker": "2026 点题锁分班",
@@ -71,8 +73,10 @@ sets = [
      "desc": "点题锁分第 1 讲，机械安全与电气安全重点突出，题型紧扣考点，适合系统复习。"},
     {"id": "s5", "title": "李天宇 8 套卷 · 第 5 套", "kicker": "2026 点题锁分班",
      "desc": "点题锁分班（三），李天宇 8 套卷之五，题型紧贴考点，适合考前冲刺刷题。"},
+    {"id": "s6", "title": "李天宇 8 套卷 · 第 6 套", "kicker": "2026 模考大赛",
+     "desc": "模考大赛班，李天宇 8 套卷之六，全真模拟考试节奏，适合考前查漏补缺。"},
 ]
-out = {"sets": sets, "questions": set1 + set2 + set3 + set4 + set5}
+out = {"sets": sets, "questions": set1 + set2 + set3 + set4 + set5 + set6}
 with open(os.path.join(BASE, "questions_full.json"), "w", encoding="utf-8") as f:
     json.dump(out, f, ensure_ascii=False)
 for s in sets:
@@ -84,3 +88,4 @@ print("img2 文件数:", len(os.listdir(os.path.join(www, "img2"))))
 print("img3 文件数:", len(os.listdir(os.path.join(www, "img3"))))
 print("img4 文件数:", len(os.listdir(os.path.join(www, "img4"))))
 print("img5 文件数:", len(os.listdir(os.path.join(www, "img5"))))
+print("img6 文件数:", len(os.listdir(os.path.join(www, "img6"))))
