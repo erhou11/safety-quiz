@@ -71,6 +71,10 @@ set10 = build_set("s10", "ocr_work/questions_fagui1.json", "img10",
                   {n: q for (s, n), q in existing_by_set_n.items() if s == "s10"})
 set11 = build_set("s11", "ocr_work/questions_fagui2.json", "img11",
                   {n: q for (s, n), q in existing_by_set_n.items() if s == "s11"})
+for _i in range(12, 17):
+    _sid = "s%d" % _i
+    globals()[_sid] = build_set(_sid, "ocr_work/questions_m5_%d.json" % (_i - 11), "img%d" % _i,
+                 {n: q for (st, n), q in existing_by_set_n.items() if st == _sid})
 
 subjects = [
     {"id": "fagui", "title": "法规", "desc": "安全生产法律法规"},
@@ -108,8 +112,18 @@ sets = [
      "desc": "唐忍-2026安全生产法律法规-阶段测评（一）。"},
     {"id": "s11", "subject": "fagui", "title": "26法规安勇亲编卷3-2", "kicker": "阶段测评",
      "desc": "安勇-2026安全生产法律法规-阶段测评（二）。"},
+   {"id": "s12", "subject": "fagui", "title": "法规顺利模拟卷（一）", "kicker": "顺利模考",
+     "desc": "2026顺利中级注安法规模拟卷（一），70单选+15多选。"},
+   {"id": "s13", "subject": "fagui", "title": "法规顺利模拟卷（二）", "kicker": "顺利模考",
+     "desc": "2026顺利中级注安法规模拟卷（二），70单选+15多选。"},
+   {"id": "s14", "subject": "fagui", "title": "法规顺利模拟卷（三）", "kicker": "顺利模考",
+     "desc": "2026顺利中级注安法规模拟卷（三），70单选+15多选。"},
+   {"id": "s15", "subject": "fagui", "title": "法规顺利模拟卷（四）", "kicker": "顺利模考",
+     "desc": "2026顺利中级注安法规模拟卷（四），70单选+15多选。"},
+   {"id": "s16", "subject": "fagui", "title": "法规顺利模拟卷（五）", "kicker": "顺利模考",
+     "desc": "2026顺利中级注安法规模拟卷（五），70单选+15多选。"},
 ]
-out = {"subjects": subjects, "sets": sets, "questions": set2 + set3 + set4 + set1 + set5 + set6 + set7 + set8 + set9 + set10 + set11}
+out = {"subjects": subjects, "sets": sets, "questions": set2 + set3 + set4 + set1 + set5 + set6 + set7 + set8 + set9 + set10 + set11 + s12 + s13 + s14 + s15 + s16}
 with open(os.path.join(BASE, "questions_full.json"), "w", encoding="utf-8") as f:
     json.dump(out, f, ensure_ascii=False)
 for s in sets:
