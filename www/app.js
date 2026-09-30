@@ -39,6 +39,7 @@ function renderSetTabs() {
 }
 
 async function loadHome() {
+  loadMe().catch(() => {});
   const meta = await api('meta');
   setsMeta = meta.sets;
   if (!setsMeta.some(s => s.id === curSet)) curSet = setsMeta[0].id;
@@ -158,5 +159,44 @@ function finishRound() {
 }
 $('#r-retry').onclick = async () => { await api('reset', { method: 'POST', body: withSet(null, JSON.stringify({ mode })) }); startQuiz(mode, 0); };
 $('#r-home').onclick = () => { show('home'); loadHome(); };
+
+let authMode = 'login';
+async function loadMe() {
+  const me = await api('me');
+  const logged = !!me.logged_in;
+  $('#user-info').textContent = logged ? me.email : '';
+  $('#btn-auth').classList.toggle('hidden', logged);
+  $('#btn-logout').classList.toggle('hidden', !logged);
+}
+function setAuthMode(m) {
+  authMode = m;
+  $('#tab-login').classList.toggle('active', m === 'login');
+  $('#tab-register').classList.toggle('active', m === 'register');
+  $('#auth-submit').textContent = m === 'login' ? '登录' : '注册';
+  $('#auth-err').textContent = '';
+  $('#auth-password').setAttribute('autocomplete', m === 'login' ? 'current-password' : 'new-password');
+}
+$('#btn-auth').onclick = () => { setAuthMode('login'); $('#auth-email').value = ''; $('#auth-password').value = ''; show('auth'); };
+$('#btn-logout').onclick = async () => {
+  await api('logout', { method: 'POST' });
+  localStorage.removeItem('quiz_set'); curSet = 's1';
+  loadHome();
+};
+$('#auth-back').onclick = () => { show('home'); };
+$('#tab-login').onclick = () => setAuthMode('login');
+$('#tab-register').onclick = () => setAuthMode('register');
+$('#auth-submit').onclick = async () => {
+  const email = $('#auth-email').value.trim(), password = $('#auth-password').value;
+  const err = $('#auth-err');
+  if (!email || !password) { err.textContent = '请输入邮箱和密码'; return; }
+  $('#auth-submit').disabled = true;
+  try {
+    const r = await api(authMode, { method: 'POST', body: JSON.stringify({ email, password }) });
+    if (!r.ok) { err.textContent = r.msg || '操作失败'; return; }
+    show('home'); loadHome();
+  } catch (e) { err.textContent = '网络异常，请稍后重试'; }
+  finally { $('#auth-submit').disabled = false; }
+};
+$('#auth-password').addEventListener('keydown', e => { if (e.key === 'Enter') $('#auth-submit').click(); });
 
 loadHome().catch(e => { $('#set-desc').textContent = '服务连接失败，请稍后重试'; });

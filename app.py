@@ -1,7 +1,10 @@
 """安全生产技术刷题 App 后端：Flask + SQLite，题目作答/进度/错题全部服务端持久化。
 支持多套题：每套题独立的进度、随机顺序与错题本。"""
-import json, os, sqlite3, secrets, random
+import json, os, re, sqlite3, secrets, random
+from datetime import timedelta
 from flask import Flask, request, jsonify, session, g
+from werkzeug.security import generate_password_hash, check_password_hash
+EMAIL_RE = re.compile(r'^[^@\s]+@[^@\s]+\.[^@\s]+$')
 
 BASE = os.path.dirname(os.path.abspath(__file__))
 DATA_DIR = os.path.join(BASE, 'data')
@@ -27,6 +30,7 @@ with open(sk_file, 'rb') as f:
     app.secret_key = f.read()
 app.config['SESSION_COOKIE_HTTPONLY'] = True
 app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
+app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=30)
 
 
 def db():
@@ -78,6 +82,11 @@ def init_db():
     CREATE TABLE IF NOT EXISTS rand_order(
         client TEXT, set_id TEXT DEFAULT 's1', order_json TEXT,
         PRIMARY KEY(client, set_id));
+    CREATE TABLE IF NOT EXISTS users(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        email TEXT UNIQUE NOT NULL,
+        pw_hash TEXT NOT NULL,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP);
     ''')
     # 迁移旧库：没有 set_id 列说明是旧表，重建（旧数据归为 s1）
     if not _has_col(d, 'answers', 'set_id'):
@@ -89,9 +98,39 @@ def init_db():
 
 
 def cid():
+    uid = session.get('uid')
+    if uid:
+        return 'u%d' % uid
     if 'cid' not in session:
         session['cid'] = secrets.token_hex(16)
     return session['cid']
+
+
+def migrate_anon_to_user(anon_cid, uid):
+    """登录/注册时把当前匿名进度合并到账号下（账号已有数据优先保留）。"""
+    if not anon_cid:
+        return
+    new_cid = 'u%d' % uid
+    if anon_cid == new_cid:
+        return
+    d = db()
+    d.execute('INSERT OR IGNORE INTO answers(client,set_id,n,selected,correct,ts)'
+              ' SELECT ?,set_id,n,selected,correct,ts FROM answers WHERE client=?',
+              (new_cid, anon_cid))
+    d.execute('INSERT OR IGNORE INTO wrong(client,set_id,n,ts)'
+              ' SELECT ?,set_id,n,ts FROM wrong WHERE client=?', (new_cid, anon_cid))
+    d.execute('INSERT OR IGNORE INTO progress(client,set_id,mode,pos)'
+              ' SELECT ?,set_id,mode,pos FROM progress WHERE client=?', (new_cid, anon_cid))
+    d.execute('INSERT OR IGNORE INTO rand_order(client,set_id,order_json)'
+              ' SELECT ?,set_id,order_json FROM rand_order WHERE client=?', (new_cid, anon_cid))
+    d.commit()
+
+
+def _do_login(uid, email):
+    migrate_anon_to_user(session.get('cid'), uid)
+    session['uid'] = uid
+    session['email'] = email
+    session.permanent = True
 
 
 def req_set():
@@ -140,6 +179,51 @@ def meta():
                     'single': sum(1 for q in qs if q['type'] == 'single'),
                     'multi': sum(1 for q in qs if q['type'] == 'multi')})
     return jsonify({'sets': out})
+
+
+@app.post('/api/register')
+def register():
+    body = request.get_json(force=True) or {}
+    email = (body.get('email') or '').strip().lower()
+    password = body.get('password') or ''
+    if not EMAIL_RE.match(email):
+        return jsonify({'ok': False, 'msg': '邮箱格式不正确'}), 400
+    if len(password) < 6:
+        return jsonify({'ok': False, 'msg': '密码至少 6 位'}), 400
+    d = db()
+    try:
+        cur = d.execute('INSERT INTO users(email, pw_hash) VALUES (?, ?)',
+                        (email, generate_password_hash(password)))
+        d.commit()
+    except sqlite3.IntegrityError:
+        return jsonify({'ok': False, 'msg': '该邮箱已注册，请直接登录'}), 409
+    _do_login(cur.lastrowid, email)
+    return jsonify({'ok': True, 'email': email})
+
+
+@app.post('/api/login')
+def login():
+    body = request.get_json(force=True) or {}
+    email = (body.get('email') or '').strip().lower()
+    password = body.get('password') or ''
+    row = db().execute('SELECT id, pw_hash FROM users WHERE email=?', (email,)).fetchone()
+    if not row or not check_password_hash(row['pw_hash'], password):
+        return jsonify({'ok': False, 'msg': '邮箱或密码不正确'}), 401
+    _do_login(row['id'], email)
+    return jsonify({'ok': True, 'email': email})
+
+
+@app.post('/api/logout')
+def logout():
+    session.clear()
+    return jsonify({'ok': True})
+
+
+@app.get('/api/me')
+def me():
+    if session.get('uid'):
+        return jsonify({'logged_in': True, 'email': session.get('email')})
+    return jsonify({'logged_in': False})
 
 
 @app.route('/api/health')

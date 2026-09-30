@@ -5,11 +5,16 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
 <title>安全生产技术刷题</title>
 <link rel="icon" href="data:,">
-<link rel="stylesheet" href="style.css?v=2">
+<link rel="stylesheet" href="style.css?v=3">
 </head>
 <body>
 <div id="app">
   <section id="screen-home" class="screen active">
+    <div class="userbar">
+      <span id="user-info" class="user-info"></span>
+      <button id="btn-auth" class="link-btn">登录 / 注册</button>
+      <button id="btn-logout" class="link-btn hidden">退出</button>
+    </div>
     <div class="hero">
       <div class="sets" id="set-tabs"></div>
       <div class="kicker" id="set-kicker">–</div>
@@ -41,6 +46,21 @@
     <div class="foot">进度与错题保存在服务器，关掉重开接着来</div>
   </section>
 
+  <section id="screen-auth" class="screen">
+    <div class="auth-card">
+      <div class="auth-tabs">
+        <button id="tab-login" class="auth-tab active">登录</button>
+        <button id="tab-register" class="auth-tab">注册</button>
+      </div>
+      <input id="auth-email" type="email" placeholder="邮箱" autocomplete="email" maxlength="64">
+      <input id="auth-password" type="password" placeholder="密码（至少 6 位）" autocomplete="current-password" maxlength="64">
+      <div id="auth-err" class="auth-err"></div>
+      <button id="auth-submit" class="submit">登录</button>
+      <button id="auth-back" class="link-btn">‹ 返回首页</button>
+      <p class="auth-tip">登录后刷题记录跟着账号走，换手机也不丢。<br>不登录也能用，记录只保存在当前浏览器。</p>
+    </div>
+  </section>
+
   <section id="screen-quiz" class="screen">
     <header class="qbar">
       <button id="q-back">‹ 返回</button>
@@ -69,6 +89,6 @@
     </div>
   </section>
 </div>
-<script src="app.js?v=2"></script>
+<script src="app.js?v=3"></script>
 </body>
 </html>

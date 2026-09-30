@@ -70,3 +70,19 @@ body{background:#131417;color:#e8e6e1;font-family:-apple-system,BlinkMacSystemFo
 .set-tab .st-c{color:#8a877f;font-size:12px}
 .set-tab.active{border-color:#c9a24b;background:#26220f;box-shadow:0 0 0 1px #c9a24b,0 6px 18px rgba(201,162,75,.18)}
 .set-tab.active .st-t{color:#f0d47a}
+
+.userbar{display:flex;align-items:center;justify-content:flex-end;gap:10px;min-height:28px;margin-bottom:6px}
+.user-info{font-size:13px;color:#c9a24b;max-width:60%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.link-btn{background:none;border:none;color:#8a877f;font-size:13px;cursor:pointer;font-family:inherit;padding:6px 4px}
+.link-btn:active{color:#c9a24b}
+.auth-card{max-width:380px;margin:60px auto 0;background:#1d1f24;border:1px solid #2a2d34;border-radius:16px;padding:28px 22px}
+.auth-tabs{display:flex;gap:8px;margin-bottom:20px}
+.auth-tab{flex:1;background:none;border:none;border-bottom:2px solid #2a2d34;color:#8a877f;font-size:16px;font-weight:600;padding:10px;cursor:pointer;font-family:inherit}
+.auth-tab.active{color:#e8e6e1;border-bottom-color:#c9a24b}
+.auth-card input{display:block;width:100%;background:#131417;border:1px solid #2a2d34;border-radius:10px;color:#e8e6e1;font-size:16px;padding:13px 14px;margin-bottom:12px;font-family:inherit}
+.auth-card input:focus{outline:none;border-color:#c9a24b}
+.auth-err{min-height:20px;color:#e07a7a;font-size:13px;margin-bottom:8px;text-align:center}
+.auth-card .submit{width:100%;margin-bottom:6px}
+.auth-card .link-btn{display:block;margin:0 auto}
+.auth-tip{text-align:center;color:#6a6d75;font-size:12px;line-height:1.8;margin-top:14px}
+.hidden{display:none!important}

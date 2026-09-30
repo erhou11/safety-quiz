@@ -1,13 +1,6 @@
 # safety-quiz 安全生产技术刷题
 
-手机刷题 Web App：两套安全生产技术试题（每套 85 道：70 单选 / 15 多选），答完即时判分并显示答案解析。进度与错题本按套独立保存在服务端，关掉重开可续做。
-
-## 题库
-
-| 套别 | 名称 | 题量 |
-|------|------|------|
-| 第一套 | 2026 点题锁分班 · 第4套 | 85 |
-| 第二套 | 安全技术基础 · 阶段评测一 | 85 |
+手机刷题 Web App：85 道安全生产技术试题（70 单选 / 15 多选），答完即时判分并显示答案解析。进度与错题本保存在服务端，关掉重开可续做。
 
 线上地址：https://st.952121.xyz
 
@@ -29,14 +22,11 @@
 
 ```
 app.py               # Flask 后端（API + 会话进度/错题存储）
-questions_full.json  # 全部题库数据（sets + questions，题干/选项/答案/解析）
+questions_full.json  # 85 道题全部数据（题干/选项/答案/解析）
 www/                 # 前端静态文件（index.html / style.css / app.js / img/）
 quizapp.service      # systemd 服务单元
 nginx-st.conf        # nginx 站点配置（参考）
-prep_data.py         # 数据准备脚本（第一套：图片提取 + JSON 瘦身，构建用）
-parse_set2.py        # 第二套解析脚本（PDF 去水印 + 题目/答案/解析提取）
-questions_set2.json  # 第二套解析中间产物（build_data.py 合并用）
-build_data.py        # 题库合并脚本（两套合并为 questions_full.json）
+prep_data.py         # 数据准备脚本（图片提取 + JSON 瘦身，构建用）
 ```
 
 ## 部署（Ubuntu + nginx）
