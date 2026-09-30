@@ -3,10 +3,9 @@ const LETTERS = 'ABCDEFGH';
 let mode = 'seq', order = [], pos = 0, roundMap = {}, t0 = 0, picked = [];
 let curSet = localStorage.getItem('quiz_set') || 's1';
 let curSubject = localStorage.getItem('quiz_subject') || 'jishu';
-// 本地存取兜底（隐私模式等场景不抛错）
-function storeGet(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
-function storeSet(k, v) { try { localStorage.setItem(k, v); } catch (e) {} }
-function storeDel(k) { try { localStorage.removeItem(k); } catch (e) {} }
+// 答题状态写进 URL hash（#quiz=seq），刷新/标签页恢复时 URL 不变，可直接回到答题页
+function setQuizHash(m) { try { history.replaceState(null, '', '#quiz=' + m); } catch (e) {} }
+function clearQuizHash() { try { history.replaceState(null, '', location.pathname + location.search); } catch (e) {} }
 let setsMeta = [];
 let subjectsMeta = [];
 
@@ -110,7 +109,7 @@ async function startQuiz(m, resumePos) {
   if (!order.length) return;
   roundMap = await api(withSet('round'));
   pos = Math.min(resumePos || 0, order.length - 1);
-  storeSet('quiz_active', JSON.stringify({ mode: m, set: curSet, subject: curSubject, ts: Date.now() }));
+  setQuizHash(m);
   show('quiz');
   renderQ();
 }
@@ -189,7 +188,7 @@ $('#q-next').onclick = () => {
   if (pos < order.length - 1) { pos++; picked = []; renderQ(); }
   else finishRound();
 };
-$('#q-back').onclick = () => { storeDel('quiz_active'); show('home'); loadHome(); };
+$('#q-back').onclick = () => { clearQuizHash(); show('home'); loadHome(); };
 
 // 进度条点击/拖拽跳转：按位置比例定位到对应题目
 const progBar = document.querySelector('.qprog');
@@ -207,7 +206,7 @@ progBar.addEventListener('pointerup', () => { progDrag = false; });
 progBar.addEventListener('pointercancel', () => { progDrag = false; });
 
 function finishRound() {
-  storeDel('quiz_active');
+  clearQuizHash();
   const total = order.length;
   let ok = 0;
   order.forEach(q => { if (roundMap[q.n] && roundMap[q.n].correct) ok++; });
@@ -271,22 +270,14 @@ $('#fs-dec').onclick = () => { if (fsIdx > 0) { fsIdx--; applyFs(); } };
 $('#fs-inc').onclick = () => { if (fsIdx < FS_LEVELS.length - 1) { fsIdx++; applyFs(); } };
 applyFs();
 
-// 页面加载：如果刷新前正在答题，自动恢复到原页面原位置
+// 页面加载：如果 URL 带有 #quiz=mode（刷新前正在答题），自动恢复到原页面原位置
 (async () => {
-  let resume = null;
-  try { resume = JSON.parse(storeGet('quiz_active') || 'null'); } catch (e) {}
-  if (resume && Date.now() - (resume.ts || 0) > 24 * 3600 * 1000) { storeDel('quiz_active'); resume = null; }
-  if (resume && resume.set && resume.mode) {
-    curSubject = resume.subject || curSubject;
-    curSet = resume.set;
-    localStorage.setItem('quiz_subject', curSubject);
-    localStorage.setItem('quiz_set', curSet);
-  }
+  const hm = (location.hash || '').match(/quiz=(seq|rand|wrong)/);
   try { await loadHome(); }
   catch (e) { $('#set-desc').textContent = '服务连接失败，请稍后重试'; return; }
-  if (resume && resume.set && resume.mode) {
+  if (hm) {
     const st = await api(withSet('state')).catch(() => null);
-    const p = !st ? 0 : resume.mode === 'seq' ? st.seq_pos : resume.mode === 'rand' ? st.rand_pos : 0;
-    startQuiz(resume.mode, p);
+    const p = !st ? 0 : hm[1] === 'seq' ? st.seq_pos : hm[1] === 'rand' ? st.rand_pos : 0;
+    startQuiz(hm[1], p);
   }
 })();
