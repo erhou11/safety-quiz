@@ -1,4 +1,4 @@
-"""合并三套题数据 -> questions_full.json（含 sets 元数据）。"""
+"""合并四套题数据 -> questions_full.json（含 sets 元数据）。"""
 import json, os, shutil, hashlib
 
 BASE = "/home/hatch/workspace/quizapp"
@@ -51,6 +51,8 @@ set2 = build_set("s2", "questions_set2.json", "img2",
                  {n: q for (s, n), q in existing_by_set_n.items() if s == "s2"})
 set3 = build_set("s3", "questions_set3.json", "img3",
                  {n: q for (s, n), q in existing_by_set_n.items() if s == "s3"})
+set4 = build_set("s4", "questions_set4.json", "img4",
+                 {n: q for (s, n), q in existing_by_set_n.items() if s == "s4"})
 
 sets = [
     {"id": "s1", "title": "2026 点题锁分班 · 第4套", "kicker": "2026 点题锁分班",
@@ -59,8 +61,10 @@ sets = [
      "desc": "按 2025 真题难度呈现，知识点覆盖全面，陷阱题型典型，适合考前重复练习。"},
     {"id": "s3", "title": "安全技术基础阶段评测二", "kicker": "2026 阶段评测",
      "desc": "李天宇 8 套卷之二，难度对标真题，覆盖机械、电气、危化品等高频考点，适合刷题巩固。"},
+    {"id": "s4", "title": "2026 点题锁分班 · 第1套", "kicker": "2026 点题锁分班",
+     "desc": "点题锁分第 1 讲，机械安全与电气安全重点突出，题型紧扣考点，适合系统复习。"},
 ]
-out = {"sets": sets, "questions": set1 + set2 + set3}
+out = {"sets": sets, "questions": set1 + set2 + set3 + set4}
 with open(os.path.join(BASE, "questions_full.json"), "w", encoding="utf-8") as f:
     json.dump(out, f, ensure_ascii=False)
 for s in sets:
@@ -70,3 +74,4 @@ for s in sets:
           sum(1 for q in qs if q["type"] == "multi"))
 print("img2 文件数:", len(os.listdir(os.path.join(www, "img2"))))
 print("img3 文件数:", len(os.listdir(os.path.join(www, "img3"))))
+print("img4 文件数:", len(os.listdir(os.path.join(www, "img4"))))
