@@ -173,6 +173,10 @@ def get_order(client, sid, mode):
 
 @app.route('/api/meta')
 def meta():
+    c = cid()
+    d = db()
+    ans_counts = {r['set_id']: r['c'] for r in d.execute(
+        'SELECT set_id, COUNT(*) AS c FROM answers WHERE client=? GROUP BY set_id', (c,))}
     out = []
     for s in SETS:
         qs = [q for q in QUESTIONS.values() if q['set'] == s['id']]
@@ -181,7 +185,8 @@ def meta():
                     'total': len(qs),
                     'single': sum(1 for q in qs if q['type'] == 'single'),
                     'multi': sum(1 for q in qs if q['type'] == 'multi'),
-                    'essay': sum(1 for q in qs if q['type'] == 'essay')})
+                    'essay': sum(1 for q in qs if q['type'] == 'essay'),
+                    'answered': ans_counts.get(s['id'], 0)})
     return jsonify({'subjects': SUBJECTS, 'sets': out})
 
 

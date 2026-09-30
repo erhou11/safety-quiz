@@ -52,10 +52,15 @@ function renderSetTabs() {
   subjectSets().forEach(s => {
     const b = document.createElement('button');
     b.className = 'set-tab' + (s.id === curSet ? ' active' : '');
-    b.innerHTML = '<div class="st-k"></div><div class="st-t"></div><div class="st-c"></div>';
+    b.innerHTML = '<div class="st-k"></div><div class="st-t"></div><div class="st-c"></div><div class="st-s"></div>';
     b.querySelector('.st-k').textContent = s.kicker;
     b.querySelector('.st-t').textContent = s.title;
     b.querySelector('.st-c').textContent = s.total + ' 题';
+    const stEl = b.querySelector('.st-s');
+    const done = s.answered || 0;
+    if (done >= s.total && s.total > 0) { stEl.textContent = '已做'; stEl.classList.add('done'); }
+    else if (done > 0) { stEl.textContent = '未做完'; stEl.classList.add('doing'); }
+    else { stEl.textContent = '未做'; stEl.classList.add('todo'); }
     b.onclick = () => {
       if (curSet === s.id) return;
       curSet = s.id;

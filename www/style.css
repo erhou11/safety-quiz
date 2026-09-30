@@ -85,6 +85,10 @@ body{background:#131417;color:#e8e6e1;font-family:-apple-system,BlinkMacSystemFo
 .set-tab .st-k{display:none}
 .set-tab .st-t{font-weight:700;font-size:14px;flex:1;margin:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .set-tab .st-c{color:#8a877f;font-size:12px;white-space:nowrap}
+.set-tab .st-s{font-size:11px;white-space:nowrap;border-radius:20px;padding:2px 8px}
+.set-tab .st-s.todo{color:#8a877f;border:1px solid #3a3d45}
+.set-tab .st-s.doing{color:#e0a44b;border:1px solid rgba(224,164,75,.5)}
+.set-tab .st-s.done{color:#3fa968;border:1px solid rgba(63,169,104,.5)}
 .set-tab.active{border-color:#c9a24b;background:#26220f;box-shadow:0 0 0 1px #c9a24b,0 6px 18px rgba(201,162,75,.18)}
 .set-tab.active .st-t{color:#f0d47a}
 
