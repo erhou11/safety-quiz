@@ -58,7 +58,18 @@ function renderSetTabs() {
     b.querySelector('.st-c').textContent = s.total + ' 题';
     const stEl = b.querySelector('.st-s');
     const done = s.answered || 0;
-    if (done >= s.total && s.total > 0) { stEl.textContent = '已做'; stEl.classList.add('done'); }
+    if (done >= s.total && s.total > 0) {
+      stEl.textContent = '已做'; stEl.classList.add('done');
+      const redo = document.createElement('span');
+      redo.className = 'st-redo'; redo.textContent = '重做';
+      redo.onclick = async (e) => {
+        e.stopPropagation();
+        if (!confirm('确定重做《' + s.title + '》？将清除本套全部作答记录。')) return;
+        await api('reset_set?set=' + s.id, { method: 'POST' });
+        loadHome();
+      };
+      b.appendChild(redo);
+    }
     else if (done > 0) { stEl.textContent = '未做完'; stEl.classList.add('doing'); }
     else { stEl.textContent = '未做'; stEl.classList.add('todo'); }
     b.onclick = () => {

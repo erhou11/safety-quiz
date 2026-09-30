@@ -342,6 +342,22 @@ def reset():
     return jsonify({'ok': True})
 
 
+@app.route('/api/reset_set', methods=['POST'])
+def reset_set():
+    """重做整套：清除该套全部作答记录与进度，回到未做状态（错题本保留）。"""
+    c = cid()
+    sid = req_set()
+    d = db()
+    d.execute('DELETE FROM answers WHERE client=? AND set_id=?', (c, sid))
+    d.execute('DELETE FROM progress WHERE client=? AND set_id=?', (c, sid))
+    order = ORDERS[sid][:]
+    random.shuffle(order)
+    d.execute('INSERT OR REPLACE INTO rand_order(client, set_id, order_json) VALUES (?, ?, ?)',
+              (c, sid, json.dumps(order)))
+    d.commit()
+    return jsonify({'ok': True})
+
+
 with app.app_context():
     init_db()
 
