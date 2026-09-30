@@ -106,6 +106,7 @@ async function startQuiz(m, resumePos) {
   if (!order.length) return;
   roundMap = await api(withSet('round'));
   pos = Math.min(resumePos || 0, order.length - 1);
+  sessionStorage.setItem('quiz_active', JSON.stringify({ mode: m, set: curSet, subject: curSubject }));
   show('quiz');
   renderQ();
 }
@@ -184,7 +185,7 @@ $('#q-next').onclick = () => {
   if (pos < order.length - 1) { pos++; picked = []; renderQ(); }
   else finishRound();
 };
-$('#q-back').onclick = () => { show('home'); loadHome(); };
+$('#q-back').onclick = () => { sessionStorage.removeItem('quiz_active'); show('home'); loadHome(); };
 
 // 进度条点击/拖拽跳转：按位置比例定位到对应题目
 const progBar = document.querySelector('.qprog');
@@ -202,6 +203,7 @@ progBar.addEventListener('pointerup', () => { progDrag = false; });
 progBar.addEventListener('pointercancel', () => { progDrag = false; });
 
 function finishRound() {
+  sessionStorage.removeItem('quiz_active');
   const total = order.length;
   let ok = 0;
   order.forEach(q => { if (roundMap[q.n] && roundMap[q.n].correct) ok++; });
@@ -265,4 +267,21 @@ $('#fs-dec').onclick = () => { if (fsIdx > 0) { fsIdx--; applyFs(); } };
 $('#fs-inc').onclick = () => { if (fsIdx < FS_LEVELS.length - 1) { fsIdx++; applyFs(); } };
 applyFs();
 
-loadHome().catch(e => { $('#set-desc').textContent = '服务连接失败，请稍后重试'; });
+// 页面加载：如果刷新前正在答题，自动恢复到原页面原位置
+(async () => {
+  let resume = null;
+  try { resume = JSON.parse(sessionStorage.getItem('quiz_active') || 'null'); } catch (e) {}
+  if (resume && resume.set && resume.mode) {
+    curSubject = resume.subject || curSubject;
+    curSet = resume.set;
+    localStorage.setItem('quiz_subject', curSubject);
+    localStorage.setItem('quiz_set', curSet);
+  }
+  try { await loadHome(); }
+  catch (e) { $('#set-desc').textContent = '服务连接失败，请稍后重试'; return; }
+  if (resume && resume.set && resume.mode) {
+    const st = await api(withSet('state')).catch(() => null);
+    const p = !st ? 0 : resume.mode === 'seq' ? st.seq_pos : resume.mode === 'rand' ? st.rand_pos : 0;
+    startQuiz(resume.mode, p);
+  }
+})();
