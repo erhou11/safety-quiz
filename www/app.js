@@ -92,6 +92,8 @@ async function loadHome() {
   $('#st-total').textContent = s.total;
   $('#st-single').textContent = s.single;
   $('#st-multi').textContent = s.multi;
+  $('#st-essay').textContent = s.essay || 0;
+  $('#st-essay-wrap').classList.toggle('hidden', !(s.essay > 0));
   const st = await api(withSet('state'));
   $('#seq-hint').textContent = st.seq_pos > 0 ? `上次做到第 ${st.seq_pos + 1} 题，点击继续` : '从第 1 题开始，完整练完一套';
   $('#rand-hint').textContent = st.rand_pos > 0 ? `上次做到第 ${st.rand_pos + 1} 题，点击继续` : '打乱顺序，随机抽题练习';
@@ -119,13 +121,28 @@ async function renderQ() {
   $('#q-count').textContent = (pos + 1) + '/' + order.length;
   $('#q-prog-fill').style.width = ((pos + 1) / order.length * 100) + '%';
   $('#q-cat').textContent = '分类 ' + q.cat;
-  $('#q-type').textContent = q.type === 'single' ? '单选题' : '多选题';
+  $('#q-type').textContent = q.type === 'single' ? '单选题' : q.type === 'multi' ? '多选题' : '简答题';
+  const qc = $('#q-case');
+  if (q.case_bg) {
+    qc.classList.remove('hidden'); qc.innerHTML = '';
+    const t = document.createElement('div'); t.className = 'qcase-title'; t.textContent = '案例背景';
+    const b = document.createElement('div'); b.className = 'qcase-body'; b.textContent = q.case_bg;
+    qc.append(t, b);
+    (q.case_images || []).forEach(u => { const i = document.createElement('img'); i.src = '/' + u; i.loading = 'lazy'; qc.appendChild(i); });
+  } else { qc.classList.add('hidden'); qc.innerHTML = ''; }
   $('#q-stem').textContent = q.n + '．' + q.stem;
   const im = $('#q-imgs'); im.innerHTML = '';
   q.images.forEach(u => { const i = document.createElement('img'); i.src = '/' + u; i.loading = 'lazy'; im.appendChild(i); });
   const box = $('#q-opts'); box.innerHTML = '';
   const prev = roundMap[q.n];
-  q.options.forEach((o, i) => {
+  if (q.type === 'essay') {
+    if (!prev) {
+      const b = document.createElement('button');
+      b.className = 'essay-btn'; b.textContent = '查看参考答案';
+      b.onclick = () => submit([]);
+      box.appendChild(b);
+    }
+  } else q.options.forEach((o, i) => {
     const L = LETTERS[i];
     const b = document.createElement('button');
     b.className = 'opt'; b.dataset.letter = L;
@@ -168,17 +185,22 @@ function showFeedback(q, res) {
     else if (res.selected.includes(L)) b.classList.add('wrong');
     b.classList.add('done');
   });
+  const eb = document.querySelector('.essay-btn'); if (eb) eb.remove();
   $('#q-submit').classList.add('hidden');
   const fb = $('#q-feedback'); fb.classList.remove('hidden');
   const t = document.createElement('div');
   t.className = 'fb-title ' + (res.correct ? 'ok' : 'no');
-  t.textContent = res.correct ? '回答正确' : '回答错误';
-  const row = document.createElement('div');
-  row.className = 'fb-row'; row.innerHTML = '正确答案：<b></b>';
-  row.querySelector('b').textContent = res.answer.join('、');
+  t.textContent = q.type === 'essay' ? '参考答案' : (res.correct ? '回答正确' : '回答错误');
+  fb.append(t);
+  if (q.type !== 'essay') {
+    const row = document.createElement('div');
+    row.className = 'fb-row'; row.innerHTML = '正确答案：<b></b>';
+    row.querySelector('b').textContent = res.answer.join('、');
+    fb.append(row);
+  }
   const exp = document.createElement('div');
   exp.className = 'fb-exp'; exp.textContent = res.explanation;
-  fb.append(t, row, exp);
+  fb.append(exp);
   res.exp_images.forEach(u => { const i = document.createElement('img'); i.src = '/' + u; fb.appendChild(i); });
 }
 

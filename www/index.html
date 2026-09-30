@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
 <title>注册安全工程师刷题</title>
 <link rel="icon" href="data:,">
-<link rel="stylesheet" href="style.css?v=12">
+<link rel="stylesheet" href="style.css?v=13">
 </head>
 <body>
 <div id="app">
@@ -26,6 +26,7 @@
         <div><b id="st-total">–</b><span>本套题目</span></div>
         <div><b id="st-single">–</b><span>单选题</span></div>
         <div><b id="st-multi">–</b><span>多选题</span></div>
+        <div id="st-essay-wrap"><b id="st-essay">–</b><span>简答题</span></div>
       </div>
     </div>
     <div class="cards">
@@ -77,6 +78,7 @@
       <button id="fs-inc" class="fs-btn">A+</button>
     </header>
     <div class="qmeta"><span id="q-cat"></span><span id="q-type"></span></div>
+    <div class="qcase hidden" id="q-case"></div>
     <div class="qstem" id="q-stem"></div>
     <div class="qimgs" id="q-imgs"></div>
     <div class="qopts" id="q-opts"></div>
@@ -98,6 +100,6 @@
     </div>
   </section>
 </div>
-<script src="app.js?v=10"></script>
+<script src="app.js?v=11"></script>
 </body>
 </html>

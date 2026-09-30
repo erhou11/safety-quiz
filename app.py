@@ -143,7 +143,8 @@ def req_set():
 def public_q(sid, n):
     q = QUESTIONS['%s:%d' % (sid, n)]
     return {'n': q['n'], 'cat': q['cat'], 'type': q['type'],
-            'stem': q['stem'], 'options': q['options'], 'images': q['images']}
+            'stem': q['stem'], 'options': q['options'], 'images': q['images'],
+            'case_bg': q.get('case_bg', ''), 'case_images': q.get('case_images', [])}
 
 
 def full_q(sid, n):
@@ -179,7 +180,8 @@ def meta():
                     'subject': s.get('subject', 'jishu'), 'desc': s.get('desc', ''),
                     'total': len(qs),
                     'single': sum(1 for q in qs if q['type'] == 'single'),
-                    'multi': sum(1 for q in qs if q['type'] == 'multi')})
+                    'multi': sum(1 for q in qs if q['type'] == 'multi'),
+                    'essay': sum(1 for q in qs if q['type'] == 'essay')})
     return jsonify({'subjects': SUBJECTS, 'sets': out})
 
 
