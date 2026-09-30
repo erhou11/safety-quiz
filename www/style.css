@@ -6,7 +6,7 @@ body{background:#131417;color:#e8e6e1;font-family:-apple-system,BlinkMacSystemFo
 .hero{padding:26px 4px 6px}
 .kicker{color:#c9a24b;font-size:13px;letter-spacing:2px;margin-bottom:12px}
 .kicker::before{content:"";display:inline-block;width:28px;height:3px;background:#c9a24b;vertical-align:middle;margin-right:10px}
-.hero h1{font-size:34px;margin-bottom:14px;letter-spacing:1px}
+.hero h1{font-size:24px;margin-bottom:14px;letter-spacing:1px}
 .desc{color:#9a978f;font-size:14px;line-height:1.7;margin-bottom:22px}
 .stats{display:flex;gap:30px;margin-bottom:26px}
 .stats b{display:block;font-size:30px}
