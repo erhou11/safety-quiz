@@ -186,6 +186,21 @@ $('#q-next').onclick = () => {
 };
 $('#q-back').onclick = () => { show('home'); loadHome(); };
 
+// 进度条点击/拖拽跳转：按位置比例定位到对应题目
+const progBar = document.querySelector('.qprog');
+let progDrag = false;
+function progSeek(e) {
+  if (!order.length) return;
+  const r = progBar.getBoundingClientRect();
+  const ratio = Math.min(1, Math.max(0, (e.clientX - r.left) / r.width));
+  const target = Math.min(order.length - 1, Math.floor(ratio * order.length));
+  if (target !== pos) { pos = target; picked = []; renderQ(); }
+}
+progBar.addEventListener('pointerdown', e => { progDrag = true; progBar.setPointerCapture(e.pointerId); progSeek(e); });
+progBar.addEventListener('pointermove', e => { if (progDrag) progSeek(e); });
+progBar.addEventListener('pointerup', () => { progDrag = false; });
+progBar.addEventListener('pointercancel', () => { progDrag = false; });
+
 function finishRound() {
   const total = order.length;
   let ok = 0;
