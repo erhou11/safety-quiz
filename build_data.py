@@ -1,4 +1,4 @@
-"""合并四套题数据 -> questions_full.json（含 sets 元数据）。"""
+"""合并五套题数据 -> questions_full.json（含 sets 元数据）。"""
 import json, os, shutil, hashlib
 
 BASE = "/home/hatch/workspace/quizapp"
@@ -27,18 +27,22 @@ def build_set(sid, json_path, img_subdir, existing):
             "images": [], "exp_images": [],
             "options": [{"text": o["text"]} for o in q["options"]],
         }
-        for u in q["images"]:
+        def add_img(u, field):
             if os.path.exists(u):
                 raw = open(u, "rb").read()
                 name = hashlib.sha256(raw).hexdigest()[:12] + ".png"
                 dst = os.path.join(imgdir, name)
                 if not os.path.exists(dst):
                     shutil.copyfile(u, dst)
-                nq["images"].append(img_subdir + "/" + name)
+                nq[field].append(img_subdir + "/" + name)
             elif q["n"] in existing:
-                nq["images"] = existing[q["n"]]["images"]
+                nq[field] = existing[q["n"]][field]
             else:
                 raise FileNotFoundError(f"{sid} Q{q['n']} 图片源丢失: {u}")
+        for u in q["images"]:
+            add_img(u, "images")
+        for u in q.get("exp_images", []):
+            add_img(u, "exp_images")
         out.append(nq)
     return out
 
@@ -53,6 +57,8 @@ set3 = build_set("s3", "questions_set3.json", "img3",
                  {n: q for (s, n), q in existing_by_set_n.items() if s == "s3"})
 set4 = build_set("s4", "questions_set4.json", "img4",
                  {n: q for (s, n), q in existing_by_set_n.items() if s == "s4"})
+set5 = build_set("s5", "questions_set5.json", "img5",
+                 {n: q for (s, n), q in existing_by_set_n.items() if s == "s5"})
 
 sets = [
     {"id": "s1", "title": "2026 点题锁分班 · 第4套", "kicker": "2026 点题锁分班",
@@ -63,8 +69,10 @@ sets = [
      "desc": "李天宇 8 套卷之二，难度对标真题，覆盖机械、电气、危化品等高频考点，适合刷题巩固。"},
     {"id": "s4", "title": "2026 点题锁分班 · 第1套", "kicker": "2026 点题锁分班",
      "desc": "点题锁分第 1 讲，机械安全与电气安全重点突出，题型紧扣考点，适合系统复习。"},
+    {"id": "s5", "title": "李天宇 8 套卷 · 第 5 套", "kicker": "2026 点题锁分班",
+     "desc": "点题锁分班（三），李天宇 8 套卷之五，题型紧贴考点，适合考前冲刺刷题。"},
 ]
-out = {"sets": sets, "questions": set1 + set2 + set3 + set4}
+out = {"sets": sets, "questions": set1 + set2 + set3 + set4 + set5}
 with open(os.path.join(BASE, "questions_full.json"), "w", encoding="utf-8") as f:
     json.dump(out, f, ensure_ascii=False)
 for s in sets:
@@ -75,3 +83,4 @@ for s in sets:
 print("img2 文件数:", len(os.listdir(os.path.join(www, "img2"))))
 print("img3 文件数:", len(os.listdir(os.path.join(www, "img3"))))
 print("img4 文件数:", len(os.listdir(os.path.join(www, "img4"))))
+print("img5 文件数:", len(os.listdir(os.path.join(www, "img5"))))

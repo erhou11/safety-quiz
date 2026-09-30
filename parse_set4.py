@@ -24,6 +24,8 @@ for pi, p in enumerate(d):
             continue
         if b[0] > 400 and b[1] < 60:
             continue  # 页眉logo
+        if b[1] < 50 or "中级注册安全工程师" in t:
+            continue  # 页眉标题
         if b[1] > 750:
             continue  # 页脚
         parts.append(t)
