@@ -1,4 +1,4 @@
-"""合并九套题数据 -> questions_full.json（含 sets 元数据）。"""
+"""合并十套题数据 -> questions_full.json（含 sets 元数据）。"""
 import json, os, shutil, hashlib
 
 BASE = "/home/hatch/workspace/quizapp"
@@ -67,6 +67,10 @@ set8 = build_set("s8", "ocr_work/questions_set8.json", "img8",
                  {n: q for (s, n), q in existing_by_set_n.items() if s == "s8"})
 set9 = build_set("s9", "ocr_work/questions_set9.json", "img9",
                  {n: q for (s, n), q in existing_by_set_n.items() if s == "s9"})
+set10 = build_set("s10", "ocr_work/questions_fagui1.json", "img10",
+                  {n: q for (s, n), q in existing_by_set_n.items() if s == "s10"})
+set11 = build_set("s11", "ocr_work/questions_fagui2.json", "img11",
+                  {n: q for (s, n), q in existing_by_set_n.items() if s == "s11"})
 
 subjects = [
     {"id": "fagui", "title": "法规", "desc": "安全生产法律法规"},
@@ -100,8 +104,12 @@ sets = [
      "desc": "注安技术顺利押题1。"},
     {"id": "s9", "subject": "jishu", "title": "技术顺利2套", "kicker": "顺利押题",
      "desc": "注安技术顺利押题2。"},
+    {"id": "s10", "subject": "fagui", "title": "法规唐第1套", "kicker": "阶段测评",
+     "desc": "唐忍-2026安全生产法律法规-阶段测评（一）。"},
+    {"id": "s11", "subject": "fagui", "title": "法规安第1套", "kicker": "阶段测评",
+     "desc": "安勇-2026安全生产法律法规-阶段测评（二）。"},
 ]
-out = {"subjects": subjects, "sets": sets, "questions": set2 + set3 + set4 + set1 + set5 + set6 + set7 + set8 + set9}
+out = {"subjects": subjects, "sets": sets, "questions": set2 + set3 + set4 + set1 + set5 + set6 + set7 + set8 + set9 + set10 + set11}
 with open(os.path.join(BASE, "questions_full.json"), "w", encoding="utf-8") as f:
     json.dump(out, f, ensure_ascii=False)
 for s in sets:
@@ -117,3 +125,5 @@ print("img6 文件数:", len(os.listdir(os.path.join(www, "img6"))))
 print("img7 文件数:", len(os.listdir(os.path.join(www, "img7"))))
 print("img8 文件数:", len(os.listdir(os.path.join(www, "img8"))))
 print("img9 文件数:", len(os.listdir(os.path.join(www, "img9"))))
+print("img10 文件数:", len(os.listdir(os.path.join(www, "img10"))))
+print("img11 文件数:", len(os.listdir(os.path.join(www, "img11"))))
