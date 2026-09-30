@@ -104,9 +104,9 @@ sets = [
      "desc": "注安技术顺利押题1。"},
     {"id": "s9", "subject": "jishu", "title": "技术顺利2套", "kicker": "顺利押题",
      "desc": "注安技术顺利押题2。"},
-    {"id": "s10", "subject": "fagui", "title": "法规唐第1套", "kicker": "阶段测评",
+    {"id": "s10", "subject": "fagui", "title": "法规2-1", "kicker": "阶段测评",
      "desc": "唐忍-2026安全生产法律法规-阶段测评（一）。"},
-    {"id": "s11", "subject": "fagui", "title": "法规安第1套", "kicker": "阶段测评",
+    {"id": "s11", "subject": "fagui", "title": "法规3-2", "kicker": "阶段测评",
      "desc": "安勇-2026安全生产法律法规-阶段测评（二）。"},
 ]
 out = {"subjects": subjects, "sets": sets, "questions": set2 + set3 + set4 + set1 + set5 + set6 + set7 + set8 + set9 + set10 + set11}
