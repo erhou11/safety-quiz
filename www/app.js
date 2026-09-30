@@ -3,6 +3,10 @@ const LETTERS = 'ABCDEFGH';
 let mode = 'seq', order = [], pos = 0, roundMap = {}, t0 = 0, picked = [];
 let curSet = localStorage.getItem('quiz_set') || 's1';
 let curSubject = localStorage.getItem('quiz_subject') || 'jishu';
+// 本地存取兜底（隐私模式等场景不抛错）
+function storeGet(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
+function storeSet(k, v) { try { localStorage.setItem(k, v); } catch (e) {} }
+function storeDel(k) { try { localStorage.removeItem(k); } catch (e) {} }
 let setsMeta = [];
 let subjectsMeta = [];
 
@@ -106,7 +110,7 @@ async function startQuiz(m, resumePos) {
   if (!order.length) return;
   roundMap = await api(withSet('round'));
   pos = Math.min(resumePos || 0, order.length - 1);
-  sessionStorage.setItem('quiz_active', JSON.stringify({ mode: m, set: curSet, subject: curSubject }));
+  storeSet('quiz_active', JSON.stringify({ mode: m, set: curSet, subject: curSubject, ts: Date.now() }));
   show('quiz');
   renderQ();
 }
@@ -185,7 +189,7 @@ $('#q-next').onclick = () => {
   if (pos < order.length - 1) { pos++; picked = []; renderQ(); }
   else finishRound();
 };
-$('#q-back').onclick = () => { sessionStorage.removeItem('quiz_active'); show('home'); loadHome(); };
+$('#q-back').onclick = () => { storeDel('quiz_active'); show('home'); loadHome(); };
 
 // 进度条点击/拖拽跳转：按位置比例定位到对应题目
 const progBar = document.querySelector('.qprog');
@@ -203,7 +207,7 @@ progBar.addEventListener('pointerup', () => { progDrag = false; });
 progBar.addEventListener('pointercancel', () => { progDrag = false; });
 
 function finishRound() {
-  sessionStorage.removeItem('quiz_active');
+  storeDel('quiz_active');
   const total = order.length;
   let ok = 0;
   order.forEach(q => { if (roundMap[q.n] && roundMap[q.n].correct) ok++; });
@@ -270,7 +274,8 @@ applyFs();
 // 页面加载：如果刷新前正在答题，自动恢复到原页面原位置
 (async () => {
   let resume = null;
-  try { resume = JSON.parse(sessionStorage.getItem('quiz_active') || 'null'); } catch (e) {}
+  try { resume = JSON.parse(storeGet('quiz_active') || 'null'); } catch (e) {}
+  if (resume && Date.now() - (resume.ts || 0) > 24 * 3600 * 1000) { storeDel('quiz_active'); resume = null; }
   if (resume && resume.set && resume.mode) {
     curSubject = resume.subject || curSubject;
     curSet = resume.set;
