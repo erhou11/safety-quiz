@@ -1,6 +1,7 @@
 const $ = s => document.querySelector(s);
 const LETTERS = 'ABCDEFGH';
 let mode = 'seq', order = [], pos = 0, roundMap = {}, t0 = 0, picked = [];
+let favSet = new Set();
 let curSet = localStorage.getItem('quiz_set') || 's1';
 let curSubject = localStorage.getItem('quiz_subject') || 'jishu';
 // 答题状态写进 URL hash（#quiz=seq），刷新/标签页恢复时 URL 不变，可直接回到答题页
@@ -119,6 +120,10 @@ async function loadHome() {
   const bw = $('#btn-wrong');
   bw.classList.toggle('disabled', st.wrong_count === 0);
   bw.onclick = () => { if (st.wrong_count > 0) startQuiz('wrong', 0); };
+  $('#fav-hint').textContent = st.fav_count > 0 ? `共 ${st.fav_count} 道收藏，点击重练` : '点题目旁的 ★ 收藏题目';
+  const bf = $('#btn-fav');
+  bf.classList.toggle('disabled', st.fav_count === 0);
+  bf.onclick = () => { if (st.fav_count > 0) startQuiz('fav', 0); };
 }
 
 async function startQuiz(m, resumePos) {
@@ -126,6 +131,7 @@ async function startQuiz(m, resumePos) {
   order = await api(withSet('questions?mode=' + m));
   if (!order.length) return;
   roundMap = await api(withSet('round'));
+  favSet = new Set(await api(withSet('favorites')).catch(() => []));
   pos = Math.min(resumePos || 0, order.length - 1);
   setQuizHash(m);
   show('quiz');
@@ -138,6 +144,13 @@ async function renderQ() {
   $('#q-prog-fill').style.width = ((pos + 1) / order.length * 100) + '%';
   $('#q-cat').textContent = '分类 ' + q.cat;
   $('#q-type').textContent = q.type === 'single' ? '单选题' : q.type === 'multi' ? '多选题' : '简答题';
+  const favBtn = $('#q-fav');
+  favBtn.classList.toggle('on', favSet.has(q.n));
+  favBtn.onclick = async () => {
+    const r = await api('favorite', { method: 'POST', body: withSet(null, JSON.stringify({ n: q.n })) });
+    if (r.faved) favSet.add(q.n); else favSet.delete(q.n);
+    favBtn.classList.toggle('on', r.faved);
+  };
   const qc = $('#q-case');
   if (q.case_bg) {
     qc.classList.remove('hidden'); qc.innerHTML = '';
@@ -310,7 +323,7 @@ applyFs();
 
 // 页面加载：如果 URL 带有 #quiz=mode（刷新前正在答题），自动恢复到原页面原位置
 (async () => {
-  const hm = (location.hash || '').match(/quiz=(seq|rand|wrong)/);
+  const hm = (location.hash || '').match(/quiz=(seq|rand|wrong|fav)/);
   try { await loadHome(); }
   catch (e) { $('#set-desc').textContent = '服务连接失败，请稍后重试'; return; }
   if (hm) {

@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
 <title>注册安全工程师刷题</title>
 <link rel="icon" href="data:,">
-<link rel="stylesheet" href="style.css?v=18">
+<link rel="stylesheet" href="style.css?v=19">
 </head>
 <body>
 <div id="app">
@@ -45,6 +45,11 @@
         <div class="card-body"><div class="card-title">错题本</div><div class="card-sub" id="wrong-hint">答错自动收录</div></div>
         <div class="card-go">›</div>
       </button>
+      <button class="card" id="btn-fav">
+        <div class="card-icon">★</div>
+        <div class="card-body"><div class="card-title">收藏夹</div><div class="card-sub" id="fav-hint">点题目旁的 ★ 收藏</div></div>
+        <div class="card-go">›</div>
+      </button>
     </div>
     <div id="subject-empty" class="empty hidden">
       <div class="empty-icon">📚</div>
@@ -77,7 +82,7 @@
       <button id="fs-dec" class="fs-btn">A-</button>
       <button id="fs-inc" class="fs-btn">A+</button>
     </header>
-    <div class="qmeta"><span id="q-cat"></span><span id="q-type"></span></div>
+    <div class="qmeta"><span id="q-cat"></span><span id="q-type"></span><button id="q-fav" class="fav-btn" title="收藏本题">★</button></div>
     <div class="qcase hidden" id="q-case"></div>
     <div class="qstem" id="q-stem"></div>
     <div class="qimgs" id="q-imgs"></div>
@@ -100,6 +105,6 @@
     </div>
   </section>
 </div>
-<script src="app.js?v=14"></script>
+<script src="app.js?v=15"></script>
 </body>
 </html>

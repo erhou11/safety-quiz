@@ -78,6 +78,9 @@ def init_db():
     CREATE TABLE IF NOT EXISTS wrong(
         client TEXT, set_id TEXT DEFAULT 's1', n INTEGER,
         ts DATETIME DEFAULT CURRENT_TIMESTAMP, PRIMARY KEY(client, set_id, n));
+    CREATE TABLE IF NOT EXISTS favorites(
+        client TEXT, set_id TEXT DEFAULT 's1', n INTEGER,
+        ts DATETIME DEFAULT CURRENT_TIMESTAMP, PRIMARY KEY(client, set_id, n));
     CREATE TABLE IF NOT EXISTS progress(
         client TEXT, set_id TEXT DEFAULT 's1', mode TEXT, pos INTEGER,
         PRIMARY KEY(client, set_id, mode));
@@ -121,6 +124,8 @@ def migrate_anon_to_user(anon_cid, uid):
               (new_cid, anon_cid))
     d.execute('INSERT OR IGNORE INTO wrong(client,set_id,n,ts)'
               ' SELECT ?,set_id,n,ts FROM wrong WHERE client=?', (new_cid, anon_cid))
+    d.execute('INSERT OR IGNORE INTO favorites(client,set_id,n,ts)'
+              ' SELECT ?,set_id,n,ts FROM favorites WHERE client=?', (new_cid, anon_cid))
     d.execute('INSERT OR IGNORE INTO progress(client,set_id,mode,pos)'
               ' SELECT ?,set_id,mode,pos FROM progress WHERE client=?', (new_cid, anon_cid))
     d.execute('INSERT OR IGNORE INTO rand_order(client,set_id,order_json)'
@@ -167,6 +172,10 @@ def get_order(client, sid, mode):
         return order
     if mode == 'wrong':
         rows = d.execute('SELECT n FROM wrong WHERE client=? AND set_id=? ORDER BY ts',
+                         (client, sid)).fetchall()
+        return [r['n'] for r in rows]
+    if mode == 'fav':
+        rows = d.execute('SELECT n FROM favorites WHERE client=? AND set_id=? ORDER BY ts',
                          (client, sid)).fetchall()
         return [r['n'] for r in rows]
     return ORDERS[sid]
@@ -251,10 +260,12 @@ def state():
         'SELECT mode, pos FROM progress WHERE client=? AND set_id=?', (c, sid))}
     wrong_n = d.execute('SELECT COUNT(*) AS c FROM wrong WHERE client=? AND set_id=?',
                         (c, sid)).fetchone()['c']
+    fav_n = d.execute('SELECT COUNT(*) AS c FROM favorites WHERE client=? AND set_id=?',
+                      (c, sid)).fetchone()['c']
     answered = d.execute('SELECT COUNT(*) AS c FROM answers WHERE client=? AND set_id=?',
                          (c, sid)).fetchone()['c']
     return jsonify({'seq_pos': prog.get('seq', 0), 'rand_pos': prog.get('rand', 0),
-                    'wrong_count': wrong_n, 'answered': answered})
+                    'wrong_count': wrong_n, 'fav_count': fav_n, 'answered': answered})
 
 
 @app.route('/api/questions')
@@ -262,7 +273,7 @@ def questions():
     c = cid()
     sid = req_set()
     mode = request.args.get('mode', 'seq')
-    if mode not in ('seq', 'rand', 'wrong'):
+    if mode not in ('seq', 'rand', 'wrong', 'fav'):
         mode = 'seq'
     return jsonify([public_q(sid, n) for n in get_order(c, sid, mode)])
 
@@ -324,6 +335,38 @@ def answer():
     d.commit()
     return jsonify({'correct': correct, 'answer': q['answer'],
                     'explanation': q['explanation'], 'exp_images': q['exp_images']})
+
+
+@app.route('/api/favorites')
+def favorites():
+    """本套已收藏的题号列表。"""
+    c = cid()
+    sid = req_set()
+    d = db()
+    rows = d.execute('SELECT n FROM favorites WHERE client=? AND set_id=? ORDER BY ts',
+                     (c, sid)).fetchall()
+    return jsonify([r['n'] for r in rows])
+
+
+@app.route('/api/favorite', methods=['POST'])
+def favorite():
+    """收藏/取消收藏某题（toggle）。"""
+    c = cid()
+    sid = req_set()
+    d = db()
+    body = request.get_json(force=True)
+    n = int(body['n'])
+    row = d.execute('SELECT 1 FROM favorites WHERE client=? AND set_id=? AND n=?',
+                    (c, sid, n)).fetchone()
+    if row:
+        d.execute('DELETE FROM favorites WHERE client=? AND set_id=? AND n=?', (c, sid, n))
+        faved = False
+    else:
+        d.execute('INSERT OR IGNORE INTO favorites(client, set_id, n) VALUES (?, ?, ?)',
+                  (c, sid, n))
+        faved = True
+    d.commit()
+    return jsonify({'faved': faved})
 
 
 @app.route('/api/reset', methods=['POST'])
