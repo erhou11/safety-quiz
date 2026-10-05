@@ -159,7 +159,7 @@ async function renderQ() {
     qc.append(t, b);
     (q.case_images || []).forEach(u => { const i = document.createElement('img'); i.src = '/' + u; i.loading = 'lazy'; qc.appendChild(i); });
   } else { qc.classList.add('hidden'); qc.innerHTML = ''; }
-  $('#q-stem').textContent = q.n + '．' + q.stem;
+  $('#q-stem').textContent = q.n + '．' + q.stem.replace(/^\s*\d+\s*[.．、]\s*/, '');
   const im = $('#q-imgs'); im.innerHTML = '';
   q.images.forEach(u => { const i = document.createElement('img'); i.src = '/' + u; i.loading = 'lazy'; im.appendChild(i); });
   const box = $('#q-opts'); box.innerHTML = '';
