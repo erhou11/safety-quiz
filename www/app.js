@@ -29,6 +29,29 @@ function subjectSets() {
   return setsMeta.filter(s => s.subject === curSubject);
 }
 
+// 套题自定义排序 (localStorage, 按科目存)
+function getSetOrder() {
+  try {
+    const o = JSON.parse(localStorage.getItem('quiz_set_order_' + curSubject) || '[]');
+    return Array.isArray(o) ? o : [];
+  } catch (e) { return []; }
+}
+function saveSetOrder(ids) {
+  localStorage.setItem('quiz_set_order_' + curSubject, JSON.stringify(ids));
+}
+function orderedSets() {
+  const ss = subjectSets();
+  const order = getSetOrder();
+  if (!order.length) return ss;
+  const pos = {};
+  order.forEach((id, i) => pos[id] = i);
+  return ss.slice().sort((a, b) => {
+    const pa = (a.id in pos) ? pos[a.id] : 1e9;
+    const pb = (b.id in pos) ? pos[b.id] : 1e9;
+    return pa - pb;
+  });
+}
+
 function renderSubjectTabs() {
   const box = $('#subject-tabs'); box.innerHTML = '';
   subjectsMeta.forEach(s => {
@@ -50,10 +73,11 @@ function renderSubjectTabs() {
 
 function renderSetTabs() {
   const box = $('#set-tabs'); box.innerHTML = '';
-  subjectSets().forEach(s => {
+  orderedSets().forEach(s => {
     const b = document.createElement('button');
     b.className = 'set-tab' + (s.id === curSet ? ' active' : '');
-    b.innerHTML = '<div class="st-k"></div><div class="st-t"></div><div class="st-c"></div><div class="st-s"></div>';
+    b.dataset.setId = s.id;
+    b.innerHTML = '<div class="st-k"></div><div class="st-t"></div><div class="st-c"></div><div class="st-s"></div><div class="st-handle">⋮⋮</div>';
     b.querySelector('.st-k').textContent = s.kicker;
     b.querySelector('.st-t').textContent = s.title;
     b.querySelector('.st-c').textContent = s.total + ' 题';
@@ -80,6 +104,62 @@ function renderSetTabs() {
       loadHome();
     };
     box.appendChild(b);
+  });
+  initSetDrag(box);
+}
+
+// 套题拖动排序 (pointer 事件, 触屏/鼠标通用; 从 ⋮⋮ 手柄发起)
+function initSetDrag(box) {
+  let dragEl = null, startY = 0, dragging = false;
+
+  box.querySelectorAll('.st-handle').forEach(h => {
+    h.addEventListener('pointerdown', e => {
+      e.preventDefault();
+      e.stopPropagation();
+      dragEl = h.closest('.set-tab');
+      startY = e.clientY;
+      dragging = false;
+      h.setPointerCapture(e.pointerId);
+      const move = ev => {
+        if (!dragEl) return;
+        const dy = ev.clientY - startY;
+        if (!dragging && Math.abs(dy) < 8) return;
+        if (!dragging) {
+          dragging = true;
+          dragEl.classList.add('dragging');
+        }
+        dragEl.style.transform = `translateY(${dy}px)`;
+        // 找插入位置
+        const tabs = [...box.querySelectorAll('.set-tab:not(.dragging)')];
+        const dragRect = dragEl.getBoundingClientRect();
+        const dragMid = dragRect.top + dragRect.height / 2;
+        let target = null;
+        for (const t of tabs) {
+          const r = t.getBoundingClientRect();
+          if (dragMid < r.top + r.height / 2) { target = t; break; }
+        }
+        if (target) box.insertBefore(dragEl, target);
+        else box.appendChild(dragEl);
+      };
+      const up = () => {
+        h.removeEventListener('pointermove', move);
+        h.removeEventListener('pointerup', up);
+        h.removeEventListener('pointercancel', up);
+        if (dragEl) {
+          dragEl.style.transform = '';
+          dragEl.classList.remove('dragging');
+          if (dragging) {
+            const ids = [...box.querySelectorAll('.set-tab')].map(el => el.dataset.setId);
+            saveSetOrder(ids);
+          }
+          dragEl = null;
+          dragging = false;
+        }
+      };
+      h.addEventListener('pointermove', move);
+      h.addEventListener('pointerup', up);
+      h.addEventListener('pointercancel', up);
+    });
   });
 }
 

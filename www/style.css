@@ -112,3 +112,9 @@ body{background:#131417;color:#e8e6e1;font-family:-apple-system,BlinkMacSystemFo
 .auth-card .link-btn{display:block;margin:0 auto}
 .auth-tip{text-align:center;color:#6a6d75;font-size:12px;line-height:1.8;margin-top:14px}
 .hidden{display:none!important}
+/* 套题拖动排序 */
+.set-tab{position:relative;touch-action:pan-y}
+.set-tab .st-handle{color:#5a5d65;font-size:14px;letter-spacing:2px;cursor:grab;user-select:none;-webkit-user-select:none;padding:4px 2px;touch-action:none}
+.set-tab .st-handle:active{cursor:grabbing;color:#c9a84c}
+.set-tab.dragging{opacity:.9;box-shadow:0 8px 24px rgba(0,0,0,.5);border-color:#c9a84c;z-index:10}
+.set-tab.drag-ghost{opacity:.35}
