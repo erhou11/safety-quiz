@@ -108,57 +108,88 @@ function renderSetTabs() {
   initSetDrag(box);
 }
 
-// 套题拖动排序 (pointer 事件, 触屏/鼠标通用; 从 ⋮⋮ 手柄发起)
+// 套题拖动排序: 长按卡片 450ms 或直接拖 ⋮⋮ 手柄, 触屏/鼠标通用
 function initSetDrag(box) {
-  let dragEl = null, startY = 0, dragging = false;
+  box.querySelectorAll('.set-tab').forEach(card => {
+    const handle = card.querySelector('.st-handle');
 
-  box.querySelectorAll('.st-handle').forEach(h => {
-    h.addEventListener('pointerdown', e => {
-      e.preventDefault();
-      e.stopPropagation();
-      dragEl = h.closest('.set-tab');
-      startY = e.clientY;
-      dragging = false;
-      h.setPointerCapture(e.pointerId);
+    card.addEventListener('pointerdown', e => {
+      // 重做按钮不触发拖动
+      if (e.target.closest('.st-redo')) return;
+      const fromHandle = !!e.target.closest('.st-handle');
+      const startX = e.clientX, startY = e.clientY;
+      let dragging = false, placeholder = null, offsetY = 0, timer = null;
+
+      const startDrag = () => {
+        dragging = true;
+        const rect = card.getBoundingClientRect();
+        offsetY = startY - rect.top;
+        placeholder = document.createElement('div');
+        placeholder.className = 'drag-placeholder';
+        placeholder.style.height = rect.height + 'px';
+        box.insertBefore(placeholder, card);
+        card.classList.add('dragging');
+        card.style.position = 'fixed';
+        card.style.left = rect.left + 'px';
+        card.style.top = rect.top + 'px';
+        card.style.width = rect.width + 'px';
+        card.style.margin = '0';
+        card.style.zIndex = '100';
+        card.style.pointerEvents = 'none';
+        // 拖动中阻止页面滚动
+        document.addEventListener('touchmove', preventScroll, { passive: false });
+      };
+      const preventScroll = ev => ev.preventDefault();
+
       const move = ev => {
-        if (!dragEl) return;
-        const dy = ev.clientY - startY;
-        if (!dragging && Math.abs(dy) < 8) return;
         if (!dragging) {
-          dragging = true;
-          dragEl.classList.add('dragging');
+          // 未进入拖动: 移动超阈值视为滚动, 取消长按
+          if (Math.abs(ev.clientX - startX) + Math.abs(ev.clientY - startY) > 12) {
+            cancel();
+          }
+          return;
         }
-        dragEl.style.transform = `translateY(${dy}px)`;
-        // 找插入位置
+        card.style.top = (ev.clientY - offsetY) + 'px';
         const tabs = [...box.querySelectorAll('.set-tab:not(.dragging)')];
-        const dragRect = dragEl.getBoundingClientRect();
-        const dragMid = dragRect.top + dragRect.height / 2;
         let target = null;
         for (const t of tabs) {
           const r = t.getBoundingClientRect();
-          if (dragMid < r.top + r.height / 2) { target = t; break; }
+          if (ev.clientY < r.top + r.height / 2) { target = t; break; }
         }
-        if (target) box.insertBefore(dragEl, target);
-        else box.appendChild(dragEl);
+        if (target) box.insertBefore(placeholder, target);
+        else box.appendChild(placeholder);
       };
+
       const up = () => {
-        h.removeEventListener('pointermove', move);
-        h.removeEventListener('pointerup', up);
-        h.removeEventListener('pointercancel', up);
-        if (dragEl) {
-          dragEl.style.transform = '';
-          dragEl.classList.remove('dragging');
-          if (dragging) {
-            const ids = [...box.querySelectorAll('.set-tab')].map(el => el.dataset.setId);
-            saveSetOrder(ids);
-          }
-          dragEl = null;
-          dragging = false;
+        cancel();
+        if (dragging && placeholder) {
+          box.insertBefore(card, placeholder);
+          placeholder.remove();
+          card.classList.remove('dragging');
+          card.style.cssText = '';
+          document.removeEventListener('touchmove', preventScroll);
+          const ids = [...box.querySelectorAll('.set-tab')].map(el => el.dataset.setId);
+          saveSetOrder(ids);
+          // 拖动后屏蔽一次点击, 防止误触选中
+          const block = ev => { ev.stopPropagation(); ev.preventDefault(); };
+          box.addEventListener('click', block, true);
+          setTimeout(() => box.removeEventListener('click', block, true), 300);
         }
+        dragging = false;
       };
-      h.addEventListener('pointermove', move);
-      h.addEventListener('pointerup', up);
-      h.addEventListener('pointercancel', up);
+
+      const cancel = () => {
+        if (timer) { clearTimeout(timer); timer = null; }
+        window.removeEventListener('pointermove', move);
+        window.removeEventListener('pointerup', up);
+        window.removeEventListener('pointercancel', up);
+      };
+
+      window.addEventListener('pointermove', move);
+      window.addEventListener('pointerup', up);
+      window.addEventListener('pointercancel', up);
+      if (fromHandle) startDrag();
+      else timer = setTimeout(startDrag, 450);
     });
   });
 }

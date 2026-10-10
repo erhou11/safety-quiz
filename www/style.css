@@ -118,3 +118,4 @@ body{background:#131417;color:#e8e6e1;font-family:-apple-system,BlinkMacSystemFo
 .set-tab .st-handle:active{cursor:grabbing;color:#c9a84c}
 .set-tab.dragging{opacity:.9;box-shadow:0 8px 24px rgba(0,0,0,.5);border-color:#c9a84c;z-index:10}
 .set-tab.drag-ghost{opacity:.35}
+.drag-placeholder{flex:1 1 100%;border:2px dashed #c9a84c;border-radius:10px;background:rgba(201,168,76,.08)}
