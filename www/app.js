@@ -77,7 +77,7 @@ function renderSetTabs() {
     const b = document.createElement('button');
     b.className = 'set-tab' + (s.id === curSet ? ' active' : '');
     b.dataset.setId = s.id;
-    b.innerHTML = '<div class="st-k"></div><div class="st-t"></div><div class="st-c"></div><div class="st-s"></div><div class="st-handle">⋮⋮</div>';
+    b.innerHTML = '<div class="st-k"></div><div class="st-t"></div><div class="st-c"></div><div class="st-s"></div>';
     b.querySelector('.st-k').textContent = s.kicker;
     b.querySelector('.st-t').textContent = s.title;
     b.querySelector('.st-c').textContent = s.total + ' 题';
@@ -111,12 +111,9 @@ function renderSetTabs() {
 // 套题拖动排序: 长按卡片 450ms 或直接拖 ⋮⋮ 手柄, 触屏/鼠标通用
 function initSetDrag(box) {
   box.querySelectorAll('.set-tab').forEach(card => {
-    const handle = card.querySelector('.st-handle');
-
     card.addEventListener('pointerdown', e => {
       // 重做按钮不触发拖动
       if (e.target.closest('.st-redo')) return;
-      const fromHandle = !!e.target.closest('.st-handle');
       const startX = e.clientX, startY = e.clientY;
       let dragging = false, placeholder = null, offsetY = 0, timer = null;
 
@@ -188,8 +185,7 @@ function initSetDrag(box) {
       window.addEventListener('pointermove', move);
       window.addEventListener('pointerup', up);
       window.addEventListener('pointercancel', up);
-      if (fromHandle) startDrag();
-      else timer = setTimeout(startDrag, 450);
+      timer = setTimeout(startDrag, 450);
     });
   });
 }
