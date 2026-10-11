@@ -235,6 +235,88 @@ async function loadHome() {
   be.classList.toggle('hidden', !(s.essay > 0));
   $('#essay-hint').textContent = s.essay > 0 ? `共 ${s.essay} 道简答题` : '';
   be.onclick = () => { if (s.essay > 0) startQuiz('essay', 0); };
+  initCardDrag(document.querySelector('.cards'));
+}
+
+// 练习卡片拖动排序: 长按 450ms, 触屏/鼠标通用, 顺序存 localStorage
+function initCardDrag(box) {
+  if (!box || box.dataset.dragInit) return;
+  box.dataset.dragInit = '1';
+  // 恢复保存的顺序
+  try {
+    const saved = JSON.parse(localStorage.getItem('quiz_card_order') || '[]');
+    if (saved.length) {
+      const map = {};
+      box.querySelectorAll('.card').forEach(c => { map[c.id] = c; });
+      saved.forEach(id => { if (map[id]) box.appendChild(map[id]); });
+    }
+  } catch (e) {}
+  box.querySelectorAll('.card').forEach(card => {
+    card.addEventListener('pointerdown', e => {
+      const startX = e.clientX, startY = e.clientY;
+      let dragging = false, placeholder = null, offsetY = 0, timer = null;
+      const preventScroll = ev => ev.preventDefault();
+      const startDrag = () => {
+        dragging = true;
+        const rect = card.getBoundingClientRect();
+        offsetY = startY - rect.top;
+        placeholder = document.createElement('div');
+        placeholder.className = 'drag-placeholder';
+        placeholder.style.height = rect.height + 'px';
+        box.insertBefore(placeholder, card);
+        card.classList.add('dragging');
+        card.style.position = 'fixed';
+        card.style.left = rect.left + 'px';
+        card.style.top = rect.top + 'px';
+        card.style.width = rect.width + 'px';
+        card.style.margin = '0';
+        card.style.zIndex = '100';
+        card.style.pointerEvents = 'none';
+        document.addEventListener('touchmove', preventScroll, { passive: false });
+      };
+      const move = ev => {
+        if (!dragging) {
+          if (Math.abs(ev.clientX - startX) + Math.abs(ev.clientY - startY) > 12) cancel();
+          return;
+        }
+        card.style.top = (ev.clientY - offsetY) + 'px';
+        const cards = [...box.querySelectorAll('.card:not(.dragging)')];
+        let target = null;
+        for (const t of cards) {
+          const r = t.getBoundingClientRect();
+          if (ev.clientY < r.top + r.height / 2) { target = t; break; }
+        }
+        if (target) box.insertBefore(placeholder, target);
+        else box.appendChild(placeholder);
+      };
+      const up = () => {
+        cancel();
+        if (dragging && placeholder) {
+          box.insertBefore(card, placeholder);
+          placeholder.remove();
+          card.classList.remove('dragging');
+          card.style.cssText = '';
+          document.removeEventListener('touchmove', preventScroll);
+          const ids = [...box.querySelectorAll('.card')].map(el => el.id);
+          try { localStorage.setItem('quiz_card_order', JSON.stringify(ids)); } catch (e) {}
+          const block = ev => { ev.stopPropagation(); ev.preventDefault(); };
+          box.addEventListener('click', block, true);
+          setTimeout(() => box.removeEventListener('click', block, true), 300);
+        }
+        dragging = false;
+      };
+      const cancel = () => {
+        if (timer) { clearTimeout(timer); timer = null; }
+        window.removeEventListener('pointermove', move);
+        window.removeEventListener('pointerup', up);
+        window.removeEventListener('pointercancel', up);
+      };
+      window.addEventListener('pointermove', move);
+      window.addEventListener('pointerup', up);
+      window.addEventListener('pointercancel', up);
+      timer = setTimeout(startDrag, 450);
+    });
+  });
 }
 
 async function startQuiz(m, resumePos) {
