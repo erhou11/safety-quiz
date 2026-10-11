@@ -263,7 +263,7 @@ async function renderQ() {
     favBtn.classList.toggle('on', r.faved);
   };
   const qc = $('#q-case');
-  if (q.case_bg) {
+  if (q.case_bg && q.type !== 'essay') {
     qc.classList.remove('hidden'); qc.innerHTML = '';
     const t = document.createElement('div'); t.className = 'qcase-title'; t.textContent = '案例背景';
     const b = document.createElement('div'); b.className = 'qcase-body'; b.textContent = q.case_bg;
