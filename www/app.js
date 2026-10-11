@@ -231,6 +231,10 @@ async function loadHome() {
   const bf = $('#btn-fav');
   bf.classList.toggle('disabled', st.fav_count === 0);
   bf.onclick = () => { if (st.fav_count > 0) startQuiz('fav', 0); };
+  const be = $('#btn-essay');
+  be.classList.toggle('hidden', !(s.essay > 0));
+  $('#essay-hint').textContent = s.essay > 0 ? `共 ${s.essay} 道简答题` : '';
+  be.onclick = () => { if (s.essay > 0) startQuiz('essay', 0); };
 }
 
 async function startQuiz(m, resumePos) {
@@ -273,6 +277,17 @@ async function renderQ() {
   const prev = roundMap[q.n];
   if (q.type === 'essay') {
     if (!prev) {
+      // 提示按钮
+      if (q.hints && q.hints.length) {
+        const hb = document.createElement('button');
+        hb.className = 'essay-btn hint-btn'; hb.textContent = '💡 提示';
+        const hintBox = document.createElement('div');
+        hintBox.className = 'hint-box hidden';
+        hintBox.innerHTML = q.hints.map((h, i) => `<span class="hint-tag">${i + 1}. ${h}</span>`).join('');
+        hb.onclick = () => hintBox.classList.toggle('hidden');
+        box.appendChild(hb);
+        box.appendChild(hintBox);
+      }
       const b = document.createElement('button');
       b.className = 'essay-btn'; b.textContent = '查看参考答案';
       b.onclick = () => submit([]);

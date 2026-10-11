@@ -6,6 +6,34 @@ from flask import Flask, request, jsonify, session, g
 from werkzeug.security import generate_password_hash, check_password_hash
 EMAIL_RE = re.compile(r'^[^@\s]+@[^@\s]+\.[^@\s]+$')
 
+def extract_hints(explanation, max_hints=6):
+    """从简答题参考答案中提取提示关键词，每条不超过5字。"""
+    # 按（1）（2）或 1. 2. 分点
+    points = re.split(r'[（(]\d+[)）]|\d+[.、]\s*', explanation)
+    points = [p.strip('；;。，, \n') for p in points if p.strip()]
+    hints = []
+    for p in points:
+        # 取第一分句
+        clause = re.split(r'[，；;。]', p)[0].strip()
+        # 去书名号内容（规范名称太长不适合做提示）
+        clause = re.sub(r'《[^》]*》', '', clause)
+        # 去常见动词前缀
+        clause = re.sub(r'^(设置|采用|进行|参照|依照|按照|指出|简述|列出|结合|根据)', '', clause)
+        clause = clause.strip('，,、。；;：: ')
+        # 优先提取数字+单位（如50%、25mm、10t）
+        m = re.search(r'\d+(?:\.\d+)?\s*(?:%|mm|t|℃|m|h|个月|年)', clause)
+        if m:
+            hint = m.group(0).replace(' ', '')
+        else:
+            # 取前5字，但跳过太短的无意义片段
+            hint = clause[:5].strip()
+            if len(hint) < 2:
+                continue
+        hint = hint.strip('，,、。；;：:')
+        if hint and hint not in hints and len(hints) < max_hints:
+            hints.append(hint)
+    return hints
+
 BASE = os.path.dirname(os.path.abspath(__file__))
 DATA_DIR = os.path.join(BASE, 'data')
 os.makedirs(DATA_DIR, exist_ok=True)
@@ -148,9 +176,12 @@ def req_set():
 
 def public_q(sid, n):
     q = QUESTIONS['%s:%d' % (sid, n)]
-    return {'n': q['n'], 'cat': q['cat'], 'type': q['type'],
+    out = {'n': q['n'], 'cat': q['cat'], 'type': q['type'],
             'stem': q['stem'], 'options': q['options'], 'images': q['images'],
             'case_bg': q.get('case_bg', ''), 'case_images': q.get('case_images', [])}
+    if q['type'] == 'essay':
+        out['hints'] = extract_hints(q.get('explanation', ''))
+    return out
 
 
 def full_q(sid, n):
@@ -178,6 +209,9 @@ def get_order(client, sid, mode):
         rows = d.execute('SELECT n FROM favorites WHERE client=? AND set_id=? ORDER BY ts',
                          (client, sid)).fetchall()
         return [r['n'] for r in rows]
+    if mode == 'essay':
+        return [n for n in ORDERS[sid]
+                if QUESTIONS['%s:%d' % (sid, n)]['type'] == 'essay']
     return ORDERS[sid]
 
 
@@ -273,7 +307,7 @@ def questions():
     c = cid()
     sid = req_set()
     mode = request.args.get('mode', 'seq')
-    if mode not in ('seq', 'rand', 'wrong', 'fav'):
+    if mode not in ('seq', 'rand', 'wrong', 'fav', 'essay'):
         mode = 'seq'
     return jsonify([public_q(sid, n) for n in get_order(c, sid, mode)])
 
