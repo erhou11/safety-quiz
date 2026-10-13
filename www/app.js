@@ -464,10 +464,33 @@ function finishRound() {
   clearQuizHash();
   const total = order.length;
   let ok = 0;
-  order.forEach(q => { if (roundMap[q.n] && roundMap[q.n].correct) ok++; });
+  // 计分：只算单选和多选
+  let score = 0, maxScore = 0;
+  order.forEach(q => {
+    const r = roundMap[q.n];
+    if (q.type === 'essay' || !r) return;
+    const ans = r.answer || [];
+    const sel = r.selected || [];
+    if (q.type === 'single') {
+      maxScore += 1;
+      if (r.correct) { ok++; score += 1; }
+    } else if (q.type === 'multi') {
+      // 多选：选错（选了答案外的选项）得0分；漏选按0.5分/个计
+      const wrong = sel.some(x => !ans.includes(x));
+      if (!wrong) {
+        const hit = sel.filter(x => ans.includes(x)).length;
+        score += hit * 0.5;
+        maxScore += ans.length * 0.5;
+        if (r.correct) ok++;
+      } else {
+        maxScore += ans.length * 0.5;
+      }
+    }
+  });
   const mins = Math.max(1, Math.round((Date.now() - t0) / 60000));
-  $('#r-score').textContent = ok + ' / ' + total;
-  $('#r-detail').textContent = `正确率 ${Math.round(ok / total * 100)}% · 用时约 ${mins} 分钟`;
+  const choiceTotal = order.filter(q => q.type !== 'essay').length;
+  $('#r-score').textContent = score + ' / ' + maxScore + ' 分';
+  $('#r-detail').textContent = `选择题 ${choiceTotal} 道 · 答对 ${ok} 道 · 用时约 ${mins} 分钟`;
   show('result');
 }
 $('#r-retry').onclick = async () => { await api('reset', { method: 'POST', body: withSet(null, JSON.stringify({ mode })) }); startQuiz(mode, 0); };
