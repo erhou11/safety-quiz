@@ -475,15 +475,12 @@ function finishRound() {
       maxScore += 1;
       if (r.correct) { ok++; score += 1; }
     } else if (q.type === 'multi') {
-      // 多选：选错（选了答案外的选项）得0分；漏选按0.5分/个计
+      // 多选：选错（选了答案外的选项）得0分；全对2分；漏选按0.5分/个计
       const wrong = sel.some(x => !ans.includes(x));
+      maxScore += 2;
       if (!wrong) {
-        const hit = sel.filter(x => ans.includes(x)).length;
-        score += hit * 0.5;
-        maxScore += ans.length * 0.5;
-        if (r.correct) ok++;
-      } else {
-        maxScore += ans.length * 0.5;
+        if (r.correct) { ok++; score += 2; }
+        else score += sel.filter(x => ans.includes(x)).length * 0.5;
       }
     }
   });
