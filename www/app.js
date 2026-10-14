@@ -484,10 +484,11 @@ function finishRound() {
       }
     }
   });
-  const mins = Math.max(1, Math.round((Date.now() - t0) / 60000));
   const choiceTotal = order.filter(q => q.type !== 'essay').length;
-  $('#r-score').textContent = score + ' / ' + maxScore + ' 分';
-  $('#r-detail').textContent = `选择题 ${choiceTotal} 道 · 答对 ${ok} 道 · 用时约 ${mins} 分钟`;
+  // 分数保留一位小数（去掉末尾的.0）
+  const fmt = n => (Math.round(n * 10) / 10).toString();
+  $('#r-score').textContent = fmt(score) + ' / ' + fmt(maxScore) + ' 分';
+  $('#r-detail').textContent = `选择题 ${choiceTotal} 道 · 答对 ${ok} 道`;
   show('result');
 }
 $('#r-retry').onclick = async () => { await api('reset', { method: 'POST', body: withSet(null, JSON.stringify({ mode })) }); startQuiz(mode, 0); };
