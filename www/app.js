@@ -463,32 +463,33 @@ progBar.addEventListener('pointercancel', () => { progDrag = false; });
 function finishRound() {
   clearQuizHash();
   const total = order.length;
-  let ok = 0;
   // 计分：只算单选和多选
   let score = 0, maxScore = 0;
+  let singleOk = 0, singleTotal = 0, multiOk = 0, multiTotal = 0;
   order.forEach(q => {
     const r = roundMap[q.n];
     if (q.type === 'essay' || !r) return;
     const ans = r.answer || [];
     const sel = r.selected || [];
     if (q.type === 'single') {
+      singleTotal++;
       maxScore += 1;
-      if (r.correct) { ok++; score += 1; }
+      if (r.correct) { singleOk++; score += 1; }
     } else if (q.type === 'multi') {
+      multiTotal++;
       // 多选：选错（选了答案外的选项）得0分；全对2分；漏选按0.5分/个计
       const wrong = sel.some(x => !ans.includes(x));
       maxScore += 2;
       if (!wrong) {
-        if (r.correct) { ok++; score += 2; }
+        if (r.correct) { multiOk++; score += 2; }
         else score += sel.filter(x => ans.includes(x)).length * 0.5;
       }
     }
   });
-  const choiceTotal = order.filter(q => q.type !== 'essay').length;
   // 分数保留一位小数（去掉末尾的.0）
   const fmt = n => (Math.round(n * 10) / 10).toString();
   $('#r-score').textContent = fmt(score) + ' / ' + fmt(maxScore) + ' 分';
-  $('#r-detail').textContent = `选择题 ${choiceTotal} 道 · 答对 ${ok} 道`;
+  $('#r-detail').textContent = `单选答对 ${singleOk}/${singleTotal} 道 · 多选答对 ${multiOk}/${multiTotal} 道`;
   show('result');
 }
 $('#r-retry').onclick = async () => { await api('reset', { method: 'POST', body: withSet(null, JSON.stringify({ mode })) }); startQuiz(mode, 0); };
