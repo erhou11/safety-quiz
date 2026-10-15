@@ -429,6 +429,10 @@ function showFeedback(q, res) {
     const wrong = (res.selected || []).some(x => !(res.answer || []).includes(x));
     if (!wrong) { fbText = '部分正确'; fbClass = 'part'; }
   }
+  // 显示用户选的答案
+  if (q.type !== 'essay' && res.selected && res.selected.length) {
+    fbText += `（你选：${res.selected.join('、')}）`;
+  }
   t.className = 'fb-title ' + fbClass;
   t.textContent = fbText;
   fb.append(t);
