@@ -422,8 +422,15 @@ function showFeedback(q, res) {
   $('#q-submit').classList.add('hidden');
   const fb = $('#q-feedback'); fb.classList.remove('hidden');
   const t = document.createElement('div');
-  t.className = 'fb-title ' + (res.correct ? 'ok' : 'no');
-  t.textContent = q.type === 'essay' ? '参考答案' : (res.correct ? '回答正确' : '回答错误');
+  let fbClass = res.correct ? 'ok' : 'no';
+  let fbText = q.type === 'essay' ? '参考答案' : (res.correct ? '回答正确' : '回答错误');
+  // 多选少选（没错选、只漏选）显示部分正确
+  if (q.type === 'multi' && !res.correct) {
+    const wrong = (res.selected || []).some(x => !(res.answer || []).includes(x));
+    if (!wrong) { fbText = '部分正确'; fbClass = 'part'; }
+  }
+  t.className = 'fb-title ' + fbClass;
+  t.textContent = fbText;
   fb.append(t);
   if (q.type !== 'essay') {
     const row = document.createElement('div');

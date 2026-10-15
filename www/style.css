@@ -121,3 +121,4 @@ body{background:#131417;color:#e8e6e1;font-family:-apple-system,BlinkMacSystemFo
 .hint-box{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px;padding:12px;background:#1e2025;border-radius:10px}
 .hint-tag{background:#2a2d33;color:#e8c86a;border:1px solid #3a3d44;border-radius:8px;padding:6px 10px;font-size:14px}
 .card.dragging{opacity:.9;box-shadow:0 8px 24px rgba(0,0,0,.5);border-color:#c9a84c}
+.fb-title.part{color:#c9a84c}
