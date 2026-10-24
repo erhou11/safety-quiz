@@ -55,14 +55,14 @@ def parse_questions(t):
             qs[n] = {"n": n, "type": typ, "stem": stem, "options": opts}
     return qs
 
-AM = re.compile(r"(?m)^(\d+)、\s*([A-E]+)\s*")
+AM = re.compile(r"(?m)^(\d+)、\s*([A-E][A-E,，、]*)\s*")
 
 def parse_answers(t):
     blocks = AM.split(t)
     ans = {}
     for i in range(1, len(blocks), 3):
         n = int(blocks[i])
-        letters = list(blocks[i + 1])
+        letters = [c for c in blocks[i + 1] if c in "ABCDE"]
         exp = blocks[i + 2].strip().replace("\n", "")
         ans[n] = {"answer": letters, "explanation": exp}
     return ans
