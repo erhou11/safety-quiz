@@ -21,17 +21,17 @@
 
 ## 阶段 2 · 前端类别导航
 
-- [ ] 首页顶部加考试类别切换（6 类），类别下沿用现有科目 tab；空类别/空科目显示「题库整理中」
-- [ ] 改 app.js/style.css 必须同步 bump index.html 的 ?v=N；部署后 curl 验 200 + 查 CF 缓存、必要时清缓存
+- [x] 首页顶部加考试类别切换（6 类），类别下沿用现有科目 tab；空类别/空科目显示「题库整理中」（本地完成，待随阶段 1 一起部署）
+- [ ] 改 app.js/style.css 必须同步 bump index.html 的 ?v=N；部署后 curl 验 200 + 查 CF 缓存、必要时清缓存（已 bump app.js v30 / style.css v26；部署待站长邮箱）
 
 ## 阶段 3 · 上传解析 + 打赏
 
-- [ ] 需登录。上传页：选类别 + 科目 + PDF 文件
-- [ ] 后端 uploads 表（uid/category/subject/文件名/状态/时间）；状态：parsing → ready（待确认）/ need_review（转人工）→ done
-- [ ] 解析：文字层 PDF 走现有解析逻辑；扫描版走 RapidOCR；解析失败 → need_review，用户端显示「等待人工审核」，任务同步登记流水线黑板 inbox
-- [ ] 确认页：展示解析出的题量与题型分布 → 用户确认 → 生成其私有套题（免费，无扣费环节）
-- [ ] 上传成功/等待页放打赏模块：支付宝 + 微信双码并排 + 自愿文案，不拦截流程（素材已备：assets/reward-alipay.jpg、assets/reward-wechat.png）
-- [ ] 每日上传上限：待用户定（旧讨论稿 1 套/天）
+- [x] 需登录。上传页：选类别 + 科目 + PDF 文件
+- [x] 后端 uploads 表（uid/category/subject/文件名/状态/时间）；状态：parsing → ready（待确认）/ need_review（转人工）→ done
+- [x] 解析：文字层 PDF 走现有解析逻辑；扫描版走 RapidOCR；解析失败 → need_review，用户端显示「等待人工审核」，任务同步登记流水线黑板 inbox（v1 落地：文字层走 upload_lib 泛化解析；无文字层/质量不达标直接转人工，OCR 由流水线小工处理）
+- [x] 确认页：展示解析出的题量与题型分布 → 用户确认 → 生成其私有套题（免费，无扣费环节）
+- [x] 上传成功/等待页放打赏模块：支付宝 + 微信双码并排 + 自愿文案，不拦截流程（素材已备：assets/reward-alipay.jpg、assets/reward-wechat.png；部署时拷入 www 并统一命名 reward-wechat.jpg）
+- [x] 每日上传上限：暂定 5 套/天防滥用（代码常量 DAILY_UPLOAD_LIMIT），待用户正式定
 
 ## 阶段 4 · 私有期满公开
 

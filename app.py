@@ -1,9 +1,10 @@
 """安全生产技术刷题 App 后端：Flask + SQLite，题目作答/进度/错题全部服务端持久化。
 支持多套题：每套题独立的进度、随机顺序与错题本。"""
-import json, os, re, sqlite3, secrets, random
-from datetime import timedelta
+import json, os, re, sqlite3, secrets, random, shutil
+from datetime import timedelta, date
 from flask import Flask, request, jsonify, session, g
 from werkzeug.security import generate_password_hash, check_password_hash
+import upload_lib
 EMAIL_RE = re.compile(r'^[^@\s]+@[^@\s]+\.[^@\s]+$')
 
 def extract_hints(explanation, max_hints=6):
@@ -123,6 +124,13 @@ def init_db():
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         email TEXT UNIQUE NOT NULL,
         pw_hash TEXT NOT NULL,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP);
+    CREATE TABLE IF NOT EXISTS uploads(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        email TEXT NOT NULL,
+        category TEXT, subject_title TEXT, title TEXT, filename TEXT,
+        status TEXT DEFAULT 'parsing',
+        summary TEXT, set_id TEXT,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP);
     ''')
     # 迁移旧库：没有 set_id 列说明是旧表，重建（旧数据归为 s1）
@@ -466,6 +474,188 @@ def reset_set():
     d.execute('INSERT OR REPLACE INTO rand_order(client, set_id, order_json) VALUES (?, ?, ?)',
               (c, sid, json.dumps(order)))
     d.commit()
+    return jsonify({'ok': True})
+
+
+# ---------------- 用户上传题库（阶段3：免费 + 打赏） ----------------
+UPLOAD_DIR = os.path.join(DATA_DIR, 'uploads')
+os.makedirs(UPLOAD_DIR, exist_ok=True)
+DAILY_UPLOAD_LIMIT = 5  # 暂定防滥用上限（套/天），待用户正式定
+
+
+def _save_questions_data():
+    """运行时新增套题/科目后把题库 JSON 原子写回磁盘（重启不丢）。"""
+    _data['subjects'] = SUBJECTS
+    tmp = os.path.join(BASE, 'questions_full.json.tmp')
+    with open(tmp, 'w', encoding='utf-8') as f:
+        json.dump(_data, f, ensure_ascii=False, indent=1)
+    os.replace(tmp, os.path.join(BASE, 'questions_full.json'))
+
+
+def _pipeline_notify(up_id, src_pdf, orig_name, email, category, subject_title):
+    """解析未过时把 PDF 登记进三 AI 流水线黑板（尽力而为，失败不影响主流程）。"""
+    pdir = os.environ.get('PIPELINE_DIR', '/opt/quizapp-pipeline')
+    inbox = os.path.join(pdir, 'inbox')
+    if not os.path.isdir(inbox):
+        return
+    try:
+        dst = os.path.join(inbox, 'U-%d-%s' % (up_id, os.path.basename(orig_name) or 'upload.pdf'))
+        shutil.copyfile(src_pdf, dst)
+        bb_path = os.path.join(pdir, 'blackboard.json')
+        lock = os.path.join(pdir, 'blackboard.lock')
+        try:
+            os.mkdir(lock)
+        except FileExistsError:
+            return
+        try:
+            with open(bb_path, encoding='utf-8') as f:
+                bb = json.load(f)
+            bb.setdefault('task_pool', []).append({
+                'id': 'U-%d' % up_id, 'pdf': 'inbox/' + os.path.basename(dst),
+                'subject': subject_title, 'category': category, 'questions': 0,
+                'status': 'pending', 'from_upload': True, 'uploader': email,
+                'created_at': date.today().isoformat()})
+            bb.setdefault('notes', []).append({
+                'at': date.today().isoformat(), 'from': 'boss',
+                'text': '用户上传 U-%d 自动解析未过，转人工处理：%s（%s）'
+                        % (up_id, orig_name, subject_title)})
+            with open(bb_path, 'w', encoding='utf-8') as f:
+                json.dump(bb, f, ensure_ascii=False, indent=1)
+        finally:
+            os.rmdir(lock)
+    except Exception:
+        pass
+
+
+def _my_upload(up_id):
+    if not session.get('uid'):
+        return None
+    return db().execute('SELECT * FROM uploads WHERE id=? AND email=?',
+                        (up_id, session.get('email'))).fetchone()
+
+
+@app.post('/api/upload')
+def upload_pdf():
+    if not session.get('uid'):
+        return jsonify({'ok': False, 'msg': '请先登录'}), 401
+    f = request.files.get('file')
+    if f is None or not (f.filename or '').lower().endswith('.pdf'):
+        return jsonify({'ok': False, 'msg': '请选择 PDF 文件'}), 400
+    category = (request.form.get('category') or 'zj-anquan').strip()
+    if CATEGORIES and category not in {c['id'] for c in CATEGORIES}:
+        return jsonify({'ok': False, 'msg': '考试类别不正确'}), 400
+    subject_title = (request.form.get('subject_title') or '').strip()[:30]
+    if not subject_title:
+        return jsonify({'ok': False, 'msg': '请填写科目名称'}), 400
+    title = (request.form.get('title') or '').strip()[:60] or \
+        os.path.splitext(os.path.basename(f.filename))[0][:60]
+    email = session.get('email')
+    d = db()
+    today_n = d.execute("SELECT COUNT(*) AS c FROM uploads WHERE email=? AND date(created_at)=date('now')",
+                        (email,)).fetchone()['c']
+    if today_n >= DAILY_UPLOAD_LIMIT:
+        return jsonify({'ok': False, 'msg': '今天上传次数已达上限（%d 套），明天再来' % DAILY_UPLOAD_LIMIT}), 429
+    cur = d.execute('INSERT INTO uploads(email, category, subject_title, title, filename, status)'
+                    ' VALUES (?, ?, ?, ?, ?, ?)',
+                    (email, category, subject_title, title, f.filename, 'parsing'))
+    up_id = cur.lastrowid
+    d.commit()
+    pdf_path = os.path.join(UPLOAD_DIR, '%d.pdf' % up_id)
+    f.save(pdf_path)
+    text = upload_lib.extract_text(pdf_path)
+    if len(text.strip()) < 200:
+        qs, warnings = [], ['未提取到文字层（可能是扫描版），转人工处理']
+    else:
+        qs, warnings = upload_lib.parse_text(text)
+    if qs:
+        with open(os.path.join(UPLOAD_DIR, '%d.json' % up_id), 'w', encoding='utf-8') as fh:
+            json.dump(qs, fh, ensure_ascii=False)
+        summary = {'total': len(qs),
+                   'single': sum(1 for q in qs if q['type'] == 'single'),
+                   'multi': sum(1 for q in qs if q['type'] == 'multi'),
+                   'warnings': warnings}
+        d.execute('UPDATE uploads SET status=?, summary=? WHERE id=?',
+                  ('ready', json.dumps(summary, ensure_ascii=False), up_id))
+        status = 'ready'
+    else:
+        summary = {'total': 0, 'warnings': warnings}
+        d.execute('UPDATE uploads SET status=?, summary=? WHERE id=?',
+                  ('need_review', json.dumps(summary, ensure_ascii=False), up_id))
+        status = 'need_review'
+        _pipeline_notify(up_id, pdf_path, f.filename, email, category, subject_title)
+    d.commit()
+    return jsonify({'ok': True, 'id': up_id, 'status': status, 'summary': summary})
+
+
+@app.get('/api/my_uploads')
+def my_uploads():
+    if not session.get('uid'):
+        return jsonify({'ok': False, 'msg': '请先登录'}), 401
+    rows = db().execute('SELECT id, category, subject_title, title, filename, status, summary, set_id, created_at'
+                        ' FROM uploads WHERE email=? ORDER BY id DESC LIMIT 50',
+                        (session.get('email'),)).fetchall()
+    out = []
+    for r in rows:
+        item = dict(r)
+        item['summary'] = json.loads(item['summary'] or '{}')
+        out.append(item)
+    return jsonify(out)
+
+
+@app.post('/api/upload/<int:up_id>/confirm')
+def upload_confirm(up_id):
+    row = _my_upload(up_id)
+    if row is None:
+        return jsonify({'ok': False, 'msg': '记录不存在或无权操作'}), 404
+    if row['status'] != 'ready':
+        return jsonify({'ok': False, 'msg': '该上传不在待确认状态'}), 400
+    with open(os.path.join(UPLOAD_DIR, '%d.json' % up_id), encoding='utf-8') as fh:
+        parsed = json.load(fh)
+    category = row['category'] or 'zj-anquan'
+    subject = next((s for s in SUBJECTS
+                    if s.get('category', 'zj-anquan') == category and s['title'] == row['subject_title']), None)
+    if subject is None:
+        subject = {'id': 'sj%d' % up_id, 'title': row['subject_title'],
+                   'desc': '用户上传', 'category': category}
+        SUBJECTS.append(subject)
+    sid = 'up%d' % up_id
+    new_set = {'id': sid, 'subject': subject['id'], 'title': row['title'],
+               'kicker': '用户上传', 'desc': '', 'category': category,
+               'owner_email': row['email'], 'created_at': date.today().isoformat(),
+               'visibility': 'private'}
+    SETS.append(new_set)
+    SET_MAP[sid] = new_set
+    SET_IDS.append(sid)
+    ns = []
+    for i, q in enumerate(parsed, 1):
+        q['set'] = sid
+        q['n'] = i
+        q['cat'] = row['subject_title']
+        _data['questions'].append(q)
+        QUESTIONS['%s:%d' % (sid, i)] = q
+        ns.append(i)
+    ORDERS[sid] = ns
+    _save_questions_data()
+    d = db()
+    d.execute('UPDATE uploads SET status=?, set_id=? WHERE id=?', ('done', sid, up_id))
+    d.commit()
+    return jsonify({'ok': True, 'set': sid, 'total': len(ns)})
+
+
+@app.post('/api/upload/<int:up_id>/discard')
+def upload_discard(up_id):
+    row = _my_upload(up_id)
+    if row is None:
+        return jsonify({'ok': False, 'msg': '记录不存在或无权操作'}), 404
+    if row['status'] == 'done':
+        return jsonify({'ok': False, 'msg': '已生成套题，不能在此放弃'}), 400
+    d = db()
+    d.execute('DELETE FROM uploads WHERE id=?', (up_id,))
+    d.commit()
+    for ext in ('pdf', 'json'):
+        p = os.path.join(UPLOAD_DIR, '%d.%s' % (up_id, ext))
+        if os.path.exists(p):
+            os.remove(p)
     return jsonify({'ok': True})
 
 

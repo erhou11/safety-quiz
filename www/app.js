@@ -548,6 +548,7 @@ async function loadMe() {
   const me = await api('me');
   const logged = !!me.logged_in;
   $('#user-info').textContent = logged ? me.email : '';
+  $('#btn-upload').classList.toggle('hidden', !logged);
   $('#btn-auth').classList.toggle('hidden', logged);
   $('#btn-logout').classList.toggle('hidden', !logged);
 }
@@ -582,6 +583,99 @@ $('#auth-submit').onclick = async () => {
   finally { $('#auth-submit').disabled = false; }
 };
 $('#auth-password').addEventListener('keydown', e => { if (e.key === 'Enter') $('#auth-submit').click(); });
+
+// ---------- 上传题库 ----------
+const UP_STATUS = { parsing: ['解析中', ''], ready: ['待确认生成', 'ready'], need_review: ['等待人工审核', 'review'], done: ['已生成套题', 'ready'] };
+$('#btn-upload').onclick = () => { show('upload'); renderUpload(); };
+$('#up-back').onclick = () => { show('home'); loadHome(); };
+
+function renderUpload() {
+  const sel = $('#up-category');
+  sel.innerHTML = '';
+  const cats = categoriesMeta.length ? categoriesMeta : [{ id: 'zj-anquan', title: '中级注册安全工程师' }];
+  cats.forEach(c => {
+    const o = document.createElement('option');
+    o.value = c.id; o.textContent = c.title;
+    if (c.id === curCategory) o.selected = true;
+    sel.appendChild(o);
+  });
+  fillSubjectList();
+  loadMyUploads();
+}
+function fillSubjectList() {
+  const cat = $('#up-category').value;
+  const dl = $('#up-subject-list'); dl.innerHTML = '';
+  subjectsMeta.filter(s => (s.category || 'zj-anquan') === cat).forEach(s => {
+    const o = document.createElement('option'); o.value = s.title; dl.appendChild(o);
+  });
+}
+$('#up-category').addEventListener('change', fillSubjectList);
+
+async function loadMyUploads() {
+  const box = $('#up-list'); box.innerHTML = '';
+  let rows = [];
+  try { rows = await api('my_uploads'); } catch (e) { return; }
+  if (!rows.length) { box.innerHTML = '<div class="up-m" style="color:#8a877f;font-size:13px">还没有上传过题库</div>'; return; }
+  rows.forEach(r => {
+    const st = UP_STATUS[r.status] || [r.status, ''];
+    const div = document.createElement('div'); div.className = 'up-item';
+    const sm = r.summary || {};
+    let meta = r.subject_title + ' · ' + (r.filename || '');
+    if (r.status === 'ready' || r.status === 'done') meta += `<br>共 ${sm.total || 0} 题（单选 ${sm.single || 0} / 多选 ${sm.multi || 0}）`;
+    if (sm.warnings && sm.warnings.length) meta += '<br>⚠ ' + sm.warnings.join('；');
+    div.innerHTML = '<div class="up-t"></div><div class="up-m"></div>';
+    div.querySelector('.up-t').innerHTML = '';
+    div.querySelector('.up-t').textContent = r.title;
+    const chip = document.createElement('span'); chip.className = 'up-chip ' + st[1]; chip.textContent = st[0];
+    div.querySelector('.up-t').appendChild(chip);
+    div.querySelector('.up-m').innerHTML = meta;
+    const acts = document.createElement('div'); acts.className = 'up-actions';
+    if (r.status === 'ready') {
+      const b1 = document.createElement('button'); b1.textContent = '生成套题';
+      b1.onclick = async () => {
+        const res = await api('upload/' + r.id + '/confirm', { method: 'POST' });
+        if (res.ok) { alert('已生成套题（仅你可见），共 ' + res.total + ' 题'); loadMyUploads(); }
+        else alert(res.msg || '生成失败');
+      };
+      acts.appendChild(b1);
+    }
+    if (r.status === 'ready' || r.status === 'need_review') {
+      const b2 = document.createElement('button'); b2.textContent = '放弃'; b2.className = 'ghost';
+      b2.onclick = async () => {
+        if (!confirm('放弃这份上传？')) return;
+        await api('upload/' + r.id + '/discard', { method: 'POST' });
+        loadMyUploads();
+      };
+      acts.appendChild(b2);
+    }
+    if (acts.children.length) div.appendChild(acts);
+    box.appendChild(div);
+  });
+}
+
+$('#up-submit').onclick = async () => {
+  const err = $('#up-err'); err.textContent = '';
+  const file = $('#up-file').files[0];
+  const subject = $('#up-subject').value.trim();
+  if (!subject) { err.textContent = '请填写科目名称'; return; }
+  if (!file) { err.textContent = '请选择 PDF 文件'; return; }
+  const fd = new FormData();
+  fd.append('file', file);
+  fd.append('category', $('#up-category').value);
+  fd.append('subject_title', subject);
+  fd.append('title', $('#up-title').value.trim());
+  $('#up-submit').disabled = true;
+  try {
+    const r = await fetch('/api/upload', { method: 'POST', body: fd });
+    const res = await r.json();
+    if (!res.ok) { err.textContent = res.msg || '上传失败'; return; }
+    $('#up-reward').classList.remove('hidden');
+    if (res.status === 'ready') alert('解析完成：共 ' + res.summary.total + ' 题，请在下方「我的上传」里确认生成套题');
+    else alert('这份 PDF 没能自动解析，已转人工审核，处理完会出现在你的上传列表里');
+    loadMyUploads();
+  } catch (e) { err.textContent = '网络异常，请稍后重试'; }
+  finally { $('#up-submit').disabled = false; }
+};
 
 // 答题字号调节（15/17/19/21 四档，记住选择）
 const FS_LEVELS = [15, 17, 19, 21];

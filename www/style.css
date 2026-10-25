@@ -124,3 +124,28 @@ body{background:#131417;color:#e8e6e1;font-family:-apple-system,BlinkMacSystemFo
 .hint-tag{background:#2a2d33;color:#e8c86a;border:1px solid #3a3d44;border-radius:8px;padding:6px 10px;font-size:14px}
 .card.dragging{opacity:.9;box-shadow:0 8px 24px rgba(0,0,0,.5);border-color:#c9a84c}
 .fb-title.part{color:#c9a84c}
+/* 上传题库 */
+.up-card{margin-top:10px;max-width:560px}
+.up-h{font-size:18px;margin-bottom:8px;text-align:center}
+.up-label{display:block;color:#9a978f;font-size:13px;margin:12px 0 6px}
+.up-card select{display:block;width:100%;background:#131417;border:1px solid #2a2d34;border-radius:10px;color:#e8e6e1;font-size:16px;padding:13px 14px;font-family:inherit}
+.up-card select:focus{outline:none;border-color:#c9a24b}
+.up-card input[type=file]{font-size:14px;padding:10px 14px}
+.up-list-wrap{max-width:560px;margin:22px auto 0}
+.up-h3{font-size:15px;margin-bottom:10px}
+.up-item{background:#1d1f24;border:1px solid #2a2d34;border-radius:12px;padding:12px 14px;margin-bottom:10px;font-size:14px}
+.up-item .up-t{font-weight:600;margin-bottom:4px}
+.up-item .up-m{color:#8a877f;font-size:12px;line-height:1.6}
+.up-chip{display:inline-block;font-size:11px;border-radius:20px;padding:2px 8px;margin-left:8px;border:1px solid #3a3d45;color:#9a978f;vertical-align:1px}
+.up-chip.ready{color:#3fa968;border-color:rgba(63,169,104,.5)}
+.up-chip.review{color:#e0a44b;border-color:rgba(224,164,75,.5)}
+.up-actions{margin-top:8px;display:flex;gap:8px}
+.up-actions button{background:#26220f;border:1px solid rgba(201,162,75,.5);color:#f0d47a;border-radius:8px;padding:6px 14px;font-size:13px;cursor:pointer;font-family:inherit}
+.up-actions button.ghost{background:none;border-color:#3a3d45;color:#9a978f}
+.reward{margin-top:16px;border-top:1px dashed #2a2d34;padding-top:14px;text-align:center}
+.reward-t{color:#b8b5ad;font-size:13px;line-height:1.7;margin-bottom:10px}
+.reward-imgs{display:flex;gap:12px;justify-content:center}
+.reward-imgs>div{flex:1;max-width:150px}
+.reward-imgs img{width:100%;border-radius:10px;display:block;background:#fff}
+.reward-imgs span{display:block;color:#8a877f;font-size:12px;margin-top:6px}
+.reward-s{color:#6a6d75;font-size:11px;margin-top:8px}
