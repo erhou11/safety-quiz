@@ -10,3 +10,9 @@ venv/
 
 # 系统文件
 .DS_Store
+.pipeline-keys/
+
+# 打赏收款码（含个人信息，不进公开仓库）
+assets/
+# 迁移生成的临时数据文件
+questions_full_v2.json

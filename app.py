@@ -43,6 +43,10 @@ with open(os.path.join(BASE, 'questions_full.json'), encoding='utf-8') as f:
     _data = json.load(f)
 SETS = _data['sets']
 SUBJECTS = _data.get('subjects', [])
+CATEGORIES = _data.get('categories', [])
+for _s in SUBJECTS:
+    _s.setdefault('category', 'zj-anquan')
+SET_MAP = {s['id']: s for s in SETS}
 QUESTIONS = {}
 for q in _data['questions']:
     QUESTIONS['%s:%d' % (q['set'], q['n'])] = q
@@ -174,6 +178,30 @@ def req_set():
     return s if s in SET_IDS else 's1'
 
 
+def set_visible(s):
+    """套题可见性：public 人人可见；private 仅所有者（按登录邮箱匹配）可见。
+    旧数据没有 visibility 字段时默认 public，保证老版本 JSON 行为不变。"""
+    if s.get('visibility', 'public') == 'public':
+        return True
+    email = session.get('email')
+    return bool(email) and email == s.get('owner_email')
+
+
+_GUARDED_PATHS = {'/api/state', '/api/questions', '/api/round', '/api/visit',
+                  '/api/answer', '/api/favorites', '/api/favorite',
+                  '/api/reset', '/api/reset_set'}
+
+
+@app.before_request
+def _guard_private_sets():
+    if request.path in _GUARDED_PATHS:
+        sid = (request.args.get('set') or
+               (request.get_json(silent=True) or {}).get('set') or 's1')
+        s = SET_MAP.get(sid)
+        if s is not None and not set_visible(s):
+            return jsonify({'ok': False, 'msg': '该套题未公开'}), 403
+
+
 def public_q(sid, n):
     q = QUESTIONS['%s:%d' % (sid, n)]
     out = {'n': q['n'], 'cat': q['cat'], 'type': q['type'],
@@ -223,15 +251,20 @@ def meta():
         'SELECT set_id, COUNT(*) AS c FROM answers WHERE client=? GROUP BY set_id', (c,))}
     out = []
     for s in SETS:
+        if not set_visible(s):
+            continue
         qs = [q for q in QUESTIONS.values() if q['set'] == s['id']]
         out.append({'id': s['id'], 'title': s['title'], 'kicker': s['kicker'],
                     'subject': s.get('subject', 'jishu'), 'desc': s.get('desc', ''),
+                    'category': s.get('category', 'zj-anquan'),
+                    'visibility': s.get('visibility', 'public'),
+                    'mine': bool(session.get('email')) and session.get('email') == s.get('owner_email'),
                     'total': len(qs),
                     'single': sum(1 for q in qs if q['type'] == 'single'),
                     'multi': sum(1 for q in qs if q['type'] == 'multi'),
                     'essay': sum(1 for q in qs if q['type'] == 'essay'),
                     'answered': ans_counts.get(s['id'], 0)})
-    return jsonify({'subjects': SUBJECTS, 'sets': out})
+    return jsonify({'categories': CATEGORIES, 'subjects': SUBJECTS, 'sets': out})
 
 
 @app.post('/api/register')

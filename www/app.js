@@ -9,6 +9,36 @@ function setQuizHash(m) { try { history.replaceState(null, '', '#quiz=' + m); } 
 function clearQuizHash() { try { history.replaceState(null, '', location.pathname + location.search); } catch (e) {} }
 let setsMeta = [];
 let subjectsMeta = [];
+let categoriesMeta = [];
+let curCategory = localStorage.getItem('quiz_category') || 'zj-anquan';
+
+function categorySubjects() {
+  if (!categoriesMeta.length) return subjectsMeta;
+  return subjectsMeta.filter(s => (s.category || 'zj-anquan') === curCategory);
+}
+
+function renderCategoryTabs() {
+  const box = $('#category-tabs'); box.innerHTML = '';
+  box.classList.toggle('hidden', categoriesMeta.length <= 1);
+  categoriesMeta.forEach(c => {
+    const b = document.createElement('button');
+    b.className = 'subj-tab' + (c.id === curCategory ? ' active' : '');
+    b.textContent = c.title;
+    b.onclick = () => {
+      if (curCategory === c.id) return;
+      curCategory = c.id;
+      localStorage.setItem('quiz_category', curCategory);
+      const cs = categorySubjects();
+      curSubject = cs.length ? cs[0].id : null;
+      if (curSubject) localStorage.setItem('quiz_subject', curSubject);
+      const ss = subjectSets();
+      curSet = ss.length ? ss[0].id : null;
+      localStorage.setItem('quiz_set', curSet || '');
+      loadHome();
+    };
+    box.appendChild(b);
+  });
+}
 
 function show(id) {
   document.querySelectorAll('.screen').forEach(e => e.classList.remove('active'));
@@ -54,7 +84,7 @@ function orderedSets() {
 
 function renderSubjectTabs() {
   const box = $('#subject-tabs'); box.innerHTML = '';
-  subjectsMeta.forEach(s => {
+  categorySubjects().forEach(s => {
     const b = document.createElement('button');
     b.className = 'subj-tab' + (s.id === curSubject ? ' active' : '');
     b.textContent = s.title;
@@ -193,9 +223,16 @@ function initSetDrag(box) {
 async function loadHome() {
   loadMe().catch(() => {});
   const meta = await api('meta');
+  categoriesMeta = meta.categories || [];
   subjectsMeta = meta.subjects || [];
   setsMeta = meta.sets;
-  if (!subjectsMeta.some(s => s.id === curSubject)) curSubject = (subjectsMeta[0] || {}).id || 'jishu';
+  if (categoriesMeta.length && !categoriesMeta.some(c => c.id === curCategory))
+    curCategory = categoriesMeta.some(c => c.id === 'zj-anquan') ? 'zj-anquan' : categoriesMeta[0].id;
+  renderCategoryTabs();
+  const cat = categoriesMeta.find(c => c.id === curCategory);
+  $('#exam-brand').textContent = cat ? cat.title : '注册安全工程师';
+  const cs = categorySubjects();
+  if (!cs.some(s => s.id === curSubject)) curSubject = cs.length ? cs[0].id : null;
   renderSubjectTabs();
   const ss = subjectSets();
   if (!ss.some(s => s.id === curSet)) curSet = ss.length ? ss[0].id : null;
@@ -206,7 +243,7 @@ async function loadHome() {
   document.querySelector('.cards').classList.toggle('hidden', !hasSets);
   $('#subject-empty').classList.toggle('hidden', hasSets);
   if (!hasSets) {
-    $('#empty-title').textContent = (subj.title || '') + '题库整理中';
+    $('#empty-title').textContent = (subj.title || (cat ? cat.title : '') || '') + '题库整理中';
     return;
   }
   const s = setsMeta.find(x => x.id === curSet);
@@ -525,8 +562,8 @@ function setAuthMode(m) {
 $('#btn-auth').onclick = () => { setAuthMode('login'); $('#auth-email').value = ''; $('#auth-password').value = ''; show('auth'); };
 $('#btn-logout').onclick = async () => {
   await api('logout', { method: 'POST' });
-  localStorage.removeItem('quiz_set'); localStorage.removeItem('quiz_subject');
-  curSubject = 'jishu'; curSet = null;
+  localStorage.removeItem('quiz_set'); localStorage.removeItem('quiz_subject'); localStorage.removeItem('quiz_category');
+  curCategory = 'zj-anquan'; curSubject = 'jishu'; curSet = null;
   loadHome();
 };
 $('#auth-back').onclick = () => { show('home'); };
