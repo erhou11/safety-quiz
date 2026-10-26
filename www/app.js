@@ -39,10 +39,7 @@ function renderCategoryTabs() {
       if (curCategory === c.id) return;
       curCategory = c.id;
       localStorage.setItem('quiz_category', curCategory);
-      const cs = categorySubjects();
-      curSubject = cs.length ? cs[0].id : null;
-      if (curSubject) localStorage.setItem('quiz_subject', curSubject);
-      const ss = subjectSets();
+      const ss = categorySets();
       curSet = ss.length ? ss[0].id : null;
       localStorage.setItem('quiz_set', curSet || '');
       loadHome();
@@ -66,22 +63,30 @@ const withSet = (p, body) => {
   return p + (p.includes('?') ? '&' : '?') + 'set=' + curSet;
 };
 
-function subjectSets() {
-  return setsMeta.filter(s => s.subject === curSubject);
+function categorySets() {
+  // 首页套题改为平铺：当前类别下全部可见套题，按科目顺序再按原顺序排
+  const catOfSubject = {};
+  subjectsMeta.forEach(s => { catOfSubject[s.id] = s.category || 'zj-anquan'; });
+  const subjIdx = {};
+  subjectsMeta.forEach((s, i) => { subjIdx[s.id] = i; });
+  return setsMeta
+    .filter(s => (s.category || catOfSubject[s.subject] || 'zj-anquan') === curCategory)
+    .slice()
+    .sort((a, b) => (subjIdx[a.subject] ?? 99) - (subjIdx[b.subject] ?? 99));
 }
 
-// 套题自定义排序 (localStorage, 按科目存)
+// 套题自定义排序 (localStorage, 按类别存)
 function getSetOrder() {
   try {
-    const o = JSON.parse(localStorage.getItem('quiz_set_order_' + curSubject) || '[]');
+    const o = JSON.parse(localStorage.getItem('quiz_set_order_cat_' + curCategory) || '[]');
     return Array.isArray(o) ? o : [];
   } catch (e) { return []; }
 }
 function saveSetOrder(ids) {
-  localStorage.setItem('quiz_set_order_' + curSubject, JSON.stringify(ids));
+  localStorage.setItem('quiz_set_order_cat_' + curCategory, JSON.stringify(ids));
 }
 function orderedSets() {
-  const ss = subjectSets();
+  const ss = categorySets();
   const order = getSetOrder();
   if (!order.length) return ss;
   const pos = {};
@@ -90,25 +95,6 @@ function orderedSets() {
     const pa = (a.id in pos) ? pos[a.id] : 1e9;
     const pb = (b.id in pos) ? pos[b.id] : 1e9;
     return pa - pb;
-  });
-}
-
-function renderSubjectTabs() {
-  const box = $('#subject-tabs'); box.innerHTML = '';
-  categorySubjects().forEach(s => {
-    const b = document.createElement('button');
-    b.className = 'subj-tab' + (s.id === curSubject ? ' active' : '');
-    b.textContent = s.title;
-    b.onclick = () => {
-      if (curSubject === s.id) return;
-      curSubject = s.id;
-      localStorage.setItem('quiz_subject', curSubject);
-      const ss = subjectSets();
-      curSet = ss.length ? ss[0].id : null;
-      localStorage.setItem('quiz_set', curSet || '');
-      loadHome();
-    };
-    box.appendChild(b);
   });
 }
 
@@ -242,23 +228,17 @@ async function loadHome() {
   if (vcats.length && !vcats.some(c => c.id === curCategory))
     curCategory = vcats.some(c => c.id === 'zj-anquan') ? 'zj-anquan' : vcats[0].id;
   renderCategoryTabs();
-  const cat = vcats.find(c => c.id === curCategory);
-  $('#exam-brand').textContent = cat ? cat.title : '注册安全工程师';
-  const cs = categorySubjects();
-  if (!cs.some(s => s.id === curSubject)) curSubject = cs.length ? cs[0].id : null;
-  renderSubjectTabs();
-  const ss = subjectSets();
+  const ss = categorySets();
   if (!ss.some(s => s.id === curSet)) curSet = ss.length ? ss[0].id : null;
+  if (curSet) {
+    const sel = setsMeta.find(x => x.id === curSet);
+    if (sel) curSubject = sel.subject;
+  }
   renderSetTabs();
-  const subj = subjectsMeta.find(x => x.id === curSubject) || {};
-  const hasSets = ss.length > 0;
+  const hasSets = !!curSet;
   document.querySelector('.hero').classList.toggle('hidden', !hasSets);
   document.querySelector('.cards').classList.toggle('hidden', !hasSets);
-  $('#subject-empty').classList.toggle('hidden', hasSets);
-  if (!hasSets) {
-    $('#empty-title').textContent = (subj.title || (cat ? cat.title : '') || '') + '题库整理中';
-    return;
-  }
+  if (!hasSets) return;
   const s = setsMeta.find(x => x.id === curSet);
   $('#set-kicker').textContent = s.kicker;
   $('#set-title').textContent = s.title;
