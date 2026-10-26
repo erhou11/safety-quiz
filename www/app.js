@@ -643,8 +643,8 @@ $('#up-back').onclick = () => { show('home'); loadHome(); };
 const REWARD_HTML = `
   <div class="reward-t">解析不要钱，服务器和人工校对要吃饭。<br>觉得好用，可以请站长喝杯水 ☕</div>
   <div class="reward-imgs">
-    <div><img src="/reward-alipay.jpg" alt="支付宝打赏码"><span>支付宝</span></div>
-    <div><img src="/reward-wechat.jpg" alt="微信打赏码"><span>微信</span></div>
+    <div><img src="/reward-alipay.jpg?v=2" alt="支付宝打赏码"><span>支付宝</span></div>
+    <div><img src="/reward-wechat.jpg?v=2" alt="微信打赏码"><span>微信</span></div>
   </div>
   <div class="reward-s">打赏完全自愿，不打赏不影响任何功能</div>`;
 ['#up-reward', '#r-reward'].forEach(s => { const el = $(s); if (el) el.innerHTML = REWARD_HTML; });
