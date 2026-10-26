@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>注册安全工程师刷题</title>
 <link rel="icon" href="data:,">
-<link rel="stylesheet" href="style.css?v=29">
+<link rel="stylesheet" href="style.css?v=30">
 </head>
 <body>
 <div id="app">
@@ -45,6 +45,18 @@
         <div class="feat-s">刷题数据统计<br>清晰可见</div>
       </div>
     </div>
+    <div class="start-wrap">
+      <button class="card start-card" id="btn-start">
+        <div class="card-icon">刷</div>
+        <div class="card-body"><div class="card-title">开始刷题</div><div class="card-sub" id="start-sub">登录后开启你的专属题库</div></div>
+        <div class="card-go">›</div>
+      </button>
+    </div>
+    <div class="foot">进度与错题保存在服务器，关掉重开接着来<br><span class="disclaimer">网站试题均来源于网络，仅供学习，禁止商用</span></div>
+  </section>
+
+  <section id="screen-practice" class="screen">
+    <button id="pr-back" class="link-btn">‹ 返回首页</button>
     <div class="subjects cats" id="category-tabs"></div>
     <div class="hero">
       <div class="sets" id="set-tabs"></div>
@@ -85,7 +97,6 @@
         <div class="card-go">›</div>
       </button>
     </div>
-    <div class="foot">进度与错题保存在服务器，关掉重开接着来<br><span class="disclaimer">网站试题均来源于网络，仅供学习，禁止商用</span></div>
   </section>
 
   <section id="screen-upload" class="screen">
@@ -160,10 +171,10 @@
     <p id="r-detail"></p>
     <div class="cards">
       <button class="card" id="r-retry"><div class="card-body"><div class="card-title">再来一轮</div></div><div class="card-go">›</div></button>
-      <button class="card" id="r-home"><div class="card-body"><div class="card-title">返回首页</div></div><div class="card-go">›</div></button>
+      <button class="card" id="r-home"><div class="card-body"><div class="card-title">返回刷题页</div></div><div class="card-go">›</div></button>
     </div>
   </section>
 </div>
-<script src="app.js?v=35"></script>
+<script src="app.js?v=36"></script>
 </body>
 </html>

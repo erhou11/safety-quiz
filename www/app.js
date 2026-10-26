@@ -42,7 +42,7 @@ function renderCategoryTabs() {
       const ss = categorySets();
       curSet = ss.length ? ss[0].id : null;
       localStorage.setItem('quiz_set', curSet || '');
-      loadHome();
+      renderPractice();
     };
     box.appendChild(b);
   });
@@ -118,7 +118,7 @@ function renderSetTabs() {
         e.stopPropagation();
         if (!confirm('确定重做《' + s.title + '》？将清除本套全部作答记录。')) return;
         await api('reset_set?set=' + s.id, { method: 'POST' });
-        loadHome();
+        renderPractice();
       };
       b.appendChild(redo);
     }
@@ -128,7 +128,7 @@ function renderSetTabs() {
       if (curSet === s.id) return;
       curSet = s.id;
       localStorage.setItem('quiz_set', curSet);
-      loadHome();
+      renderPractice();
     };
     box.appendChild(b);
   });
@@ -227,6 +227,21 @@ async function loadHome() {
   const vcats = visibleCategories();
   if (vcats.length && !vcats.some(c => c.id === curCategory))
     curCategory = vcats.some(c => c.id === 'zj-anquan') ? 'zj-anquan' : vcats[0].id;
+  updateStartBtn();
+}
+
+function updateStartBtn() {
+  const sub = $('#start-sub');
+  if (!sub) return;
+  if (setsMeta.length) {
+    const total = setsMeta.reduce((a, s) => a + (s.total || 0), 0);
+    sub.textContent = '你的题库共 ' + setsMeta.length + ' 套 · ' + total + ' 题';
+  } else {
+    sub.textContent = '登录后开启你的专属题库';
+  }
+}
+
+async function renderPractice() {
   renderCategoryTabs();
   const ss = categorySets();
   if (!ss.some(s => s.id === curSet)) curSet = ss.length ? ss[0].id : null;
@@ -484,7 +499,7 @@ $('#q-next').onclick = () => {
   if (pos < order.length - 1) { pos++; picked = []; renderQ(); }
   else finishRound();
 };
-$('#q-back').onclick = () => { clearQuizHash(); show('home'); loadHome(); };
+$('#q-back').onclick = () => { clearQuizHash(); show('practice'); renderPractice(); };
 
 // 进度条点击/拖拽跳转：按位置比例定位到对应题目
 const progBar = document.querySelector('.qprog');
@@ -534,7 +549,7 @@ function finishRound() {
   show('result');
 }
 $('#r-retry').onclick = async () => { await api('reset', { method: 'POST', body: withSet(null, JSON.stringify({ mode })) }); startQuiz(mode, 0); };
-$('#r-home').onclick = () => { show('home'); loadHome(); };
+$('#r-home').onclick = () => { show('practice'); renderPractice(); };
 
 let authMode = 'login';
 async function loadMe() {
@@ -585,6 +600,12 @@ $('#promo-upload').onclick = () => {
   if (!$('#btn-upload').classList.contains('hidden')) { show('upload'); renderUpload(); }
   else $('#btn-auth').click();
 };
+$('#btn-start').onclick = () => {
+  // 首页「开始刷题」入口：已登录进刷题页（选套题），未登录先去登录/注册
+  if (!$('#btn-upload').classList.contains('hidden')) { show('practice'); renderPractice(); }
+  else $('#btn-auth').click();
+};
+$('#pr-back').onclick = () => { show('home'); loadHome(); };
 $('#up-back').onclick = () => { show('home'); loadHome(); };
 
 function renderUpload() {

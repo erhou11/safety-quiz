@@ -174,3 +174,9 @@ body{background:#131417;color:#e8e6e1;font-family:-apple-system,BlinkMacSystemFo
   .feat-ico svg{width:21px;height:21px}
   .feat-t{font-size:14px}
 }
+
+/* 首页「开始刷题」入口卡（2026-10-26：登录后首页只放入口，选套题移到刷题页） */
+.start-wrap{margin:2px 0 20px}
+.start-card{border-color:rgba(201,162,75,.5);background:linear-gradient(180deg,#1e2027,#17181d);padding:20px 16px}
+.start-card .card-icon{background:linear-gradient(180deg,#ddbe68,#c9a24b)}
+.start-card .card-title{font-size:19px;font-weight:800;color:#dcb95e;letter-spacing:1px}
