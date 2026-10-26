@@ -127,14 +127,7 @@
       <p class="up-hint">试题和答案分开两个文件时，把答案卷传这里；都在一个文件里就不用传。</p>
       <div id="up-err" class="auth-err"></div>
       <button id="up-submit" class="submit">上传并解析</button>
-      <div id="up-reward" class="reward hidden">
-        <div class="reward-t">解析不要钱，服务器和人工校对要吃饭。<br>觉得好用，可以请站长喝杯水 ☕</div>
-        <div class="reward-imgs">
-          <div><img src="/reward-alipay.jpg" alt="支付宝打赏码"><span>支付宝</span></div>
-          <div><img src="/reward-wechat.jpg" alt="微信打赏码"><span>微信</span></div>
-        </div>
-        <div class="reward-s">打赏完全自愿，不打赏不影响任何功能</div>
-      </div>
+      <div id="up-reward" class="reward hidden"></div>
     </div>
     <div class="up-list-wrap">
       <h3 class="up-h3">我的上传</h3>
@@ -182,12 +175,13 @@
     <h2>本轮完成</h2>
     <div class="score"><b id="r-score">–</b></div>
     <p id="r-detail"></p>
+    <div id="r-reward" class="reward"></div>
     <div class="cards">
       <button class="card" id="r-retry"><div class="card-body"><div class="card-title">再来一轮</div></div><div class="card-go">›</div></button>
       <button class="card" id="r-home"><div class="card-body"><div class="card-title">返回刷题页</div></div><div class="card-go">›</div></button>
     </div>
   </section>
 </div>
-<script src="app.js?v=39"></script>
+<script src="app.js?v=40"></script>
 </body>
 </html>
