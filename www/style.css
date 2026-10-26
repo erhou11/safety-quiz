@@ -213,3 +213,10 @@ body{background:#131417;color:#e8e6e1;font-family:-apple-system,BlinkMacSystemFo
 
 /* 打赏模块统一标准（以完成页样式为准，两处共用）：金色渐变边框面板 */
 .reward{border-top:none;background:linear-gradient(#17181b,#17181b) padding-box,linear-gradient(135deg,rgba(201,162,75,.65),rgba(201,162,75,.12)) border-box;border:1px solid transparent;border-radius:16px;padding:16px 14px 12px}
+
+/* 打赏公告 + 贵宾 */
+.ticker{margin:10px 0 2px;padding:8px 12px;border:1px solid rgba(201,162,75,.35);background:rgba(201,162,75,.06);border-radius:10px;color:#cfccc4;font-size:13px;text-align:center}
+.tick-anim{animation:tickIn .45s ease}
+@keyframes tickIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+.vip-badge{margin-left:8px;padding:1px 8px;border:1px solid #b9b6ac;border-radius:999px;font-size:11px;letter-spacing:1px;vertical-align:1px}
+.reward-tip{color:#a49f92;font-size:12px;line-height:1.7;margin-top:10px}

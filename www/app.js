@@ -593,7 +593,21 @@ let authMode = 'login';
 async function loadMe() {
   const me = await api('me');
   const logged = !!me.logged_in;
-  $('#user-info').textContent = logged ? me.email : '';
+  const info = $('#user-info');
+  info.innerHTML = '';
+  if (logged) {
+    const s = document.createElement('span');
+    s.textContent = me.email;
+    if (me.vip_color) s.style.color = me.vip_color;
+    info.appendChild(s);
+    if (me.vip_tier && me.vip_tier !== '普通用户') {
+      const b = document.createElement('span');
+      b.className = 'vip-badge';
+      b.textContent = me.vip_tier;
+      if (me.vip_color) { b.style.color = me.vip_color; b.style.borderColor = me.vip_color; }
+      info.appendChild(b);
+    }
+  }
   $('#btn-upload').classList.toggle('hidden', !logged);
   $('#btn-auth').classList.toggle('hidden', logged);
   $('#btn-logout').classList.toggle('hidden', !logged);
@@ -654,6 +668,7 @@ const REWARD_HTML = `
     <div><img src="/reward-alipay.jpg?v=3" alt="支付宝打赏码"><span>支付宝</span></div>
     <div><img src="/reward-wechat.jpg?v=3" alt="微信打赏码"><span>微信</span></div>
   </div>
+  <div class="reward-tip">打赏时请在备注里写上您的登录邮箱，即可获得贵宾称号；管理员白天审核后自动更新，夜间暂停更新。</div>
   <div class="reward-s">打赏完全自愿，不打赏不影响任何功能</div>`;
 ['#up-reward', '#r-reward'].forEach(s => { const el = $(s); if (el) el.innerHTML = REWARD_HTML; });
 
@@ -785,3 +800,30 @@ applyFs();
     startQuiz(hm[1], p);
   }
 })();
+
+// 打赏公告轮换播报（首页与刷题页共用）
+const _esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+let tickerItems = [], tickerIdx = 0, tickerTimer = null;
+function renderTickerItem() {
+  if (!tickerItems.length) return;
+  const it = tickerItems[tickerIdx % tickerItems.length];
+  tickerIdx++;
+  const html = `🎉 恭喜 <b style="color:${it.color}">${_esc(it.display)}</b> 为本站捐献 ${it.amount} 元，成为${it.tier}，感谢支持！`;
+  ['#ticker-home', '#ticker-practice'].forEach(s => {
+    const el = $(s);
+    if (!el) return;
+    el.innerHTML = html;
+    el.classList.remove('tick-anim'); void el.offsetWidth; el.classList.add('tick-anim');
+  });
+}
+async function loadTicker() {
+  let items = [];
+  try { items = await api('donations/recent'); } catch (e) { return; }
+  if (!items || !items.length) return;
+  tickerItems = items;
+  ['#ticker-home', '#ticker-practice'].forEach(s => { const el = $(s); if (el) el.classList.remove('hidden'); });
+  renderTickerItem();
+  if (tickerTimer) clearInterval(tickerTimer);
+  tickerTimer = setInterval(renderTickerItem, 5000);
+}
+loadTicker();

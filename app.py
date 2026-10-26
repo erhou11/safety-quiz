@@ -151,6 +151,12 @@ def init_db():
         email TEXT UNIQUE NOT NULL,
         pw_hash TEXT NOT NULL,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP);
+    CREATE TABLE IF NOT EXISTS donations(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        email TEXT NOT NULL,
+        display_name TEXT,
+        amount REAL NOT NULL,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP);
     CREATE TABLE IF NOT EXISTS uploads(
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         email TEXT NOT NULL,
@@ -343,11 +349,53 @@ def logout():
     return jsonify({'ok': True})
 
 
+def _vip_tier(total):
+    """贵宾等级（按累计打赏金额）与名字颜色：2026-10-26 用户定版。"""
+    if total >= 100:
+        return '紫金贵宾', '#c792ff'
+    if total >= 50:
+        return '黄金贵宾', '#f0c75e'
+    if total >= 10:
+        return '白银贵宾', '#d7dde6'
+    if total > 0:
+        return '青铜贵宾', '#d08a4e'
+    return '普通用户', '#b9b6ac'
+
+
+def _donation_total(email):
+    if not email:
+        return 0
+    row = db().execute('SELECT COALESCE(SUM(amount), 0) AS t FROM donations WHERE email=?',
+                       (email,)).fetchone()
+    return row['t'] or 0
+
+
 @app.get('/api/me')
 def me():
     if session.get('uid'):
-        return jsonify({'logged_in': True, 'email': session.get('email')})
+        email = session.get('email')
+        total = _donation_total(email)
+        tier, color = _vip_tier(total)
+        return jsonify({'logged_in': True, 'email': email,
+                        'donation_total': total, 'vip_tier': tier, 'vip_color': color})
     return jsonify({'logged_in': False})
+
+
+@app.get('/api/donations/recent')
+def donations_recent():
+    """打赏公告（公开）：最近 10 笔，附捐献者当前累计等级与颜色。"""
+    rows = db().execute(
+        'SELECT d.display_name, d.amount, d.created_at, '
+        '(SELECT COALESCE(SUM(amount), 0) FROM donations WHERE email = d.email) AS total '
+        'FROM donations d ORDER BY d.id DESC LIMIT 10').fetchall()
+    out = []
+    for r in rows:
+        tier, color = _vip_tier(r['total'])
+        amt = r['amount']
+        out.append({'display': r['display_name'],
+                    'amount': int(amt) if float(amt).is_integer() else amt,
+                    'tier': tier, 'color': color, 'at': r['created_at']})
+    return jsonify(out)
 
 
 @app.route('/api/health')
