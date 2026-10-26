@@ -73,9 +73,8 @@
       <p class="auth-tip">上传带答案的试卷 PDF，系统自动解析成一套题，只有你自己能见；满 1 年后进入公共题库免费开放。扫描版或解析失败的会转人工审核。</p>
       <label class="up-label">考试类别</label>
       <select id="up-category"></select>
-      <label class="up-label">科目名称</label>
-      <input id="up-subject" list="up-subject-list" placeholder="如：安全生产技术基础" maxlength="30">
-      <datalist id="up-subject-list"></datalist>
+      <label class="up-label">科目 / 专业</label>
+      <select id="up-subject"></select>
       <label class="up-label">套题名称</label>
       <input id="up-title" placeholder="不填则用文件名" maxlength="60">
       <label class="up-label">PDF 文件</label>
@@ -143,6 +142,6 @@
     </div>
   </section>
 </div>
-<script src="app.js?v=32"></script>
+<script src="app.js?v=33"></script>
 </body>
 </html>

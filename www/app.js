@@ -10,6 +10,7 @@ function clearQuizHash() { try { history.replaceState(null, '', location.pathnam
 let setsMeta = [];
 let subjectsMeta = [];
 let categoriesMeta = [];
+let categorySubjectsMap = {};
 let curCategory = localStorage.getItem('quiz_category') || 'zj-anquan';
 
 function categorySubjects() {
@@ -234,6 +235,7 @@ async function loadHome() {
   loadMe().catch(() => {});
   const meta = await api('meta');
   categoriesMeta = meta.categories || [];
+  categorySubjectsMap = meta.category_subjects || {};
   subjectsMeta = meta.subjects || [];
   setsMeta = meta.sets;
   const vcats = visibleCategories();
@@ -614,10 +616,14 @@ function renderUpload() {
   loadMyUploads();
 }
 function fillSubjectList() {
+  // 科目/专业改为下拉选择：选项随上面选的考试类别自动匹配（规范清单来自 /api/meta）
   const cat = $('#up-category').value;
-  const dl = $('#up-subject-list'); dl.innerHTML = '';
-  subjectsMeta.filter(s => (s.category || 'zj-anquan') === cat).forEach(s => {
-    const o = document.createElement('option'); o.value = s.title; dl.appendChild(o);
+  const sel = $('#up-subject'); sel.innerHTML = '';
+  let titles = categorySubjectsMap[cat] || [];
+  if (!titles.length)
+    titles = subjectsMeta.filter(s => (s.category || 'zj-anquan') === cat).map(s => s.title);
+  titles.forEach(t => {
+    const o = document.createElement('option'); o.value = t; o.textContent = t; sel.appendChild(o);
   });
 }
 $('#up-category').addEventListener('change', fillSubjectList);
@@ -668,7 +674,7 @@ $('#up-submit').onclick = async () => {
   const err = $('#up-err'); err.textContent = '';
   const file = $('#up-file').files[0];
   const subject = $('#up-subject').value.trim();
-  if (!subject) { err.textContent = '请填写科目名称'; return; }
+  if (!subject) { err.textContent = '请选择科目 / 专业'; return; }
   if (!file) { err.textContent = '请选择 PDF 文件'; return; }
   const fd = new FormData();
   fd.append('file', file);

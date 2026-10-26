@@ -47,6 +47,32 @@ SUBJECTS = _data.get('subjects', [])
 CATEGORIES = _data.get('categories', [])
 for _s in SUBJECTS:
     _s.setdefault('category', 'zj-anquan')
+
+# 各考试类别上传时可选择的科目/专业（规范清单，2026-10-26 用户要求上传页改下拉选择）：
+# 一建/二建的专业名即该专业的「专业实务」方向，与注安实务方向 tab 的命名口径一致。
+CATEGORY_SUBJECTS = {
+    'yj-jianzao': ['建设工程经济', '建设工程法规及相关知识', '建设工程项目管理',
+                    '建筑工程', '公路工程', '铁路工程', '民航机场工程', '港口与航道工程',
+                    '水利水电工程', '市政公用工程', '通信与广电工程', '矿业工程', '机电工程'],
+    'ej-jianzao': ['建设工程施工管理', '建设工程法规及相关知识',
+                    '建筑工程', '公路工程', '水利水电工程', '市政公用工程', '矿业工程', '机电工程'],
+    'yj-xiaofang': ['消防安全技术实务', '消防安全技术综合能力', '消防安全案例分析'],
+    'ej-anquan': ['安全生产法律法规', '安全生产专业实务'],
+    'cj-anquan': ['安全生产法律法规', '安全生产实务'],
+}
+
+
+def _category_subjects():
+    """上传页下拉清单：规范清单在前，数据里已有的科目补充在后（去重）。"""
+    out = {}
+    for c in CATEGORIES:
+        cid = c['id']
+        titles = list(CATEGORY_SUBJECTS.get(cid, []))
+        for s in SUBJECTS:
+            if s.get('category', 'zj-anquan') == cid and s['title'] not in titles:
+                titles.append(s['title'])
+        out[cid] = titles
+    return out
 SET_MAP = {s['id']: s for s in SETS}
 QUESTIONS = {}
 for q in _data['questions']:
@@ -272,7 +298,8 @@ def meta():
                     'multi': sum(1 for q in qs if q['type'] == 'multi'),
                     'essay': sum(1 for q in qs if q['type'] == 'essay'),
                     'answered': ans_counts.get(s['id'], 0)})
-    return jsonify({'categories': CATEGORIES, 'subjects': SUBJECTS, 'sets': out})
+    return jsonify({'categories': CATEGORIES, 'subjects': SUBJECTS, 'sets': out,
+                    'category_subjects': _category_subjects()})
 
 
 @app.post('/api/register')
