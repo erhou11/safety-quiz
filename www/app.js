@@ -17,10 +17,20 @@ function categorySubjects() {
   return subjectsMeta.filter(s => (s.category || 'zj-anquan') === curCategory);
 }
 
+function visibleCategories() {
+  // 只显示「当前用户能看到的套题」所在的类别：没题的类别名称不出现，
+  // 哪个类别上传了题库，哪个类别的名称才显示出来（2026-10-26 用户要求）
+  const catOfSubject = {};
+  subjectsMeta.forEach(s => { catOfSubject[s.id] = s.category || 'zj-anquan'; });
+  const have = new Set(setsMeta.map(s => s.category || catOfSubject[s.subject] || 'zj-anquan'));
+  return categoriesMeta.filter(c => have.has(c.id));
+}
+
 function renderCategoryTabs() {
   const box = $('#category-tabs'); box.innerHTML = '';
-  box.classList.toggle('hidden', categoriesMeta.length <= 1);
-  categoriesMeta.forEach(c => {
+  const cats = visibleCategories();
+  box.classList.toggle('hidden', cats.length <= 1);
+  cats.forEach(c => {
     const b = document.createElement('button');
     b.className = 'subj-tab' + (c.id === curCategory ? ' active' : '');
     b.textContent = c.title;
@@ -226,10 +236,11 @@ async function loadHome() {
   categoriesMeta = meta.categories || [];
   subjectsMeta = meta.subjects || [];
   setsMeta = meta.sets;
-  if (categoriesMeta.length && !categoriesMeta.some(c => c.id === curCategory))
-    curCategory = categoriesMeta.some(c => c.id === 'zj-anquan') ? 'zj-anquan' : categoriesMeta[0].id;
+  const vcats = visibleCategories();
+  if (vcats.length && !vcats.some(c => c.id === curCategory))
+    curCategory = vcats.some(c => c.id === 'zj-anquan') ? 'zj-anquan' : vcats[0].id;
   renderCategoryTabs();
-  const cat = categoriesMeta.find(c => c.id === curCategory);
+  const cat = vcats.find(c => c.id === curCategory);
   $('#exam-brand').textContent = cat ? cat.title : '注册安全工程师';
   const cs = categorySubjects();
   if (!cs.some(s => s.id === curSubject)) curSubject = cs.length ? cs[0].id : null;
