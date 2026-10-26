@@ -292,7 +292,6 @@ async function renderSetPage() {
   const s = setsMeta.find(x => x.id === curSet);
   if (!s) { show('practice'); renderPractice(); return; }
   curSubject = s.subject;
-  $('#set-kicker').textContent = s.kicker;
   $('#set-title').textContent = s.title;
   $('#set-desc').textContent = s.desc;
   $('#st-total').textContent = s.total;
