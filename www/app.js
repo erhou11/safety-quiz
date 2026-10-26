@@ -649,7 +649,7 @@ $('#up-back').onclick = () => { show('home'); loadHome(); };
 
 // 打赏模块：上传成功页与刷完题的完成页共用同一块内容
 const REWARD_HTML = `
-  <div class="reward-t">解析不要钱，服务器和人工校对要吃饭。<br>觉得好用，可以请站长喝杯水 ☕</div>
+  <div class="reward-t">解析不要钱，服务器和人工校对要吃饭。<br>觉得好用，可以<span class="rw-gold">请站长喝杯水</span> ☕</div>
   <div class="reward-imgs">
     <div><img src="/reward-alipay.jpg?v=3" alt="支付宝打赏码"><span>支付宝</span></div>
     <div><img src="/reward-wechat.jpg?v=3" alt="微信打赏码"><span>微信</span></div>
