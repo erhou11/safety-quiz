@@ -961,9 +961,14 @@ def upload_pdf():
     # 答案 PDF 的图/表挂 exp_images。解析为空硬规定：只要有题解析为空，必须先
     # 按原文件逐页核过图/表再下结论；图/表补上后仍为空的转人工，不直接成套。
     still_empty = []
+    audit = {'blocking': {}, 'warnings': {}}
     if qs and not reused:
         img_dir = os.path.join(BASE, 'www', 'imgup')
         try:
+            # 防线（QUALITY_STRATEGY.md）：先修结构（行内/表格选项拆回），
+            # 再用坐标块第二通道救空解析，然后图/表一起提取。
+            upload_lib.split_inline_options(qs)
+            upload_lib.rescue_explanations(ans_path or pdf_path, qs)
             upload_lib.attach_pdf_images(pdf_path, qs, img_dir,
                                          'up%dq' % up_id, 'images', 'question')
             upload_lib.attach_pdf_images(ans_path or pdf_path, qs, img_dir,
@@ -971,6 +976,7 @@ def upload_pdf():
         except Exception:
             pass
         still_empty = upload_lib.resolve_empty_explanations(qs)
+        audit = upload_lib.audit_questions(qs)
         filled_by_img = [i + 1 for i, q in enumerate(qs)
                          if (q.get('explanation') or '').startswith('原书本题解析为图/表')]
         if filled_by_img or still_empty:
@@ -982,6 +988,22 @@ def upload_pdf():
         if still_empty:
             warnings.append('第 %s 题解析为空：已按原文件逐页核对文字与图/表仍未找到，转人工核对'
                             % ','.join(map(str, still_empty[:10])))
+        # 成套体检结果翻译成用户能看懂的警告；阻断项在下方硬门禁处整套拦下。
+        _AUDIT_LABEL = {'no_answer': '缺答案', 'bad_options': '选项数异常',
+                        'answer_out_of_range': '答案超出选项范围',
+                        'empty_explanation': '解析为空', 'stem_too_short': '题干过短',
+                        'dup_question': '题目重复',
+                        'stem_fig_ref_no_image': '题干提及图/表但未提取到图',
+                        'exp_fig_ref_no_image': '解析提及图/表但未提取到图',
+                        'exp_too_short': '解析过短', 'option_too_long': '选项过长疑似合并'}
+        for code, seqs in (audit.get('warnings') or {}).items():
+            warnings.append('第 %s 题%s（体检提示）'
+                            % (','.join(map(str, seqs[:10])), _AUDIT_LABEL.get(code, code)))
+        for code, seqs in (audit.get('blocking') or {}).items():
+            if code == 'empty_explanation':
+                continue  # 已由上面的解析为空警告说明
+            warnings.append('第 %s 题%s，整套转人工核对'
+                            % (','.join(map(str, seqs[:10])), _AUDIT_LABEL.get(code, code)))
 
     if qs:
         if library_match is None:
@@ -1006,9 +1028,13 @@ def upload_pdf():
             library_dup = _public_library_dup(email, qs)
             if library_dup:
                 summary['library_dup'] = library_dup
-        # 解析为空硬规定：核过原文件仍无解析且非题库引用命中的，转人工核对。
-        if still_empty and not library_match:
+        # 硬门禁（QUALITY_STRATEGY.md）：解析为空核完仍空、或成套体检有任一
+        # 阻断项（缺答案/选项异常/答案越界/整题重复/题干过短），且非题库引用
+        # 命中的，整套转人工，不许带病成套。
+        audit_blocking = audit.get('blocking') or {}
+        if (still_empty or audit_blocking) and not library_match:
             summary['empty_exp_review'] = still_empty
+            summary['audit'] = audit
             d.execute('UPDATE uploads SET status=?, summary=? WHERE id=?',
                       ('need_review', json.dumps(summary, ensure_ascii=False), up_id))
             status = 'need_review'

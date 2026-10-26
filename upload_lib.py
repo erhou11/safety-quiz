@@ -390,6 +390,154 @@ def attach_pdf_images(pdf_path, qs, out_dir, prefix, field, kind):
     return attached
 
 
+_INLINE_SEP_PAT = re.compile(r'([A-E])(?:[.、．:：]\s*|\s+)')
+_ROW_SEP_PAT = re.compile(r'([A-E])(?=[\u4e00-\u9fff])')
+
+
+def _try_split(stem, answer, pat, min_opt_len):
+    """从题干里按 A→E 顺序标号链拆选项；不达标返回 None（宁可不拆）。"""
+    marks = []
+    idx = 0
+    for letter in 'ABCDE':
+        m = pat.search(stem, idx)
+        if not m or m.group(1) != letter:
+            break
+        marks.append((m.start(), m.end()))
+        idx = m.end()
+    if len(marks) < 3 or marks[0][0] < 6:
+        return None
+    opts = []
+    for i, (_s, e) in enumerate(marks):
+        end = marks[i + 1][0] if i + 1 < len(marks) else len(stem)
+        opts.append(stem[e:end].strip())
+    if any(len(o) < min_opt_len for o in opts):
+        return None
+    if answer and any(ord(a) - 65 >= len(opts) for a in answer):
+        return None
+    new_stem = stem[:marks[0][0]].strip()
+    if len(new_stem) < 6:
+        return None
+    return new_stem, [{'text': o} for o in opts]
+
+
+def split_inline_options(qs):
+    """0 选项题的结构修复：选项被行内排版/表格行吞进题干时拆回来。
+
+    两种形态：标准行内式（「A 未设…B.仅设…」，标号带点或空格）与表格行式
+    （每行以字母起头、后接中文）。拆不达标（<3 项、某项过短、答案越界）
+    一律不动，留给成套体检拦下转人工。返回修复题数。
+    """
+    fixed = 0
+    for q in qs:
+        if q.get('type') == 'essay' or len(q.get('options') or []) >= 1:
+            continue
+        stem = (q.get('stem') or '').strip()
+        got = _try_split(stem, q.get('answer'), _INLINE_SEP_PAT, 2) or \
+            _try_split(stem, q.get('answer'), _ROW_SEP_PAT, 6)
+        if got:
+            q['stem'], q['options'] = got
+            fixed += 1
+    return fixed
+
+
+def rescue_explanations(pdf_path, qs):
+    """第二通道救解析：坐标块按条目区间再提取一遍文字，专补空解析。
+
+    行式解析在多栏排版/行序错乱时会把解析行挂错题或丢掉；这里用答案册
+    条目头的位置坐标圈定每道题的版面区间，只取区间内文字块拼回解析。
+    只填原本为空的题，绝不覆盖已解析出的内容。返回补回题数。
+    """
+    empties = {i for i, q in enumerate(qs)
+               if not (q.get('explanation') or '').strip()}
+    if not pdf_path or not empties:
+        return 0
+    try:
+        import pymupdf
+        doc = pymupdf.open(pdf_path)
+    except Exception:
+        return 0
+    entries = _find_entries(doc, 'answer')
+    if len(entries) < max(1, len(qs) // 2):
+        doc.close()
+        return 0
+    filled = 0
+    for k, (num, pno, y0) in enumerate(entries):
+        seq = k + 1
+        if seq > len(qs):
+            seq = num - entries[0][0] + 1
+        if seq - 1 not in empties:
+            continue
+        nxt = entries[k + 1] if k + 1 < len(entries) else None
+        end_p = nxt[1] if nxt else len(doc) - 1
+        lines = []
+        for p in range(pno, end_p + 1):
+            blocks = sorted(doc[p].get_text('blocks'), key=lambda b: (b[1], b[0]))
+            for b in blocks:
+                if b[4] is None:
+                    continue
+                if p == pno and b[1] < y0 - 8:
+                    continue
+                if nxt and p == nxt[1] and b[1] >= nxt[2] - 2:
+                    continue
+                lines.extend(b[4].splitlines())
+        text = ''.join(l.strip() for l in _clean(lines))
+        text = re.sub(r'^\d{1,3}\s*[、.．]\s*(?:答案\s*[:：]\s*)?[A-E]{1,6}\s*', '', text)
+        text = re.sub(r'^解析\s*[:：]\s*', '', text)
+        if len(text) >= 6:
+            qs[seq - 1]['explanation'] = text
+            filled += 1
+    doc.close()
+    return filled
+
+
+_FIG_REF_PAT = re.compile(r'如图|下图|下表|见表|图示|附图|所示')
+
+
+def audit_questions(qs):
+    """成套体检：返回 {'blocking': {问题: [题号]}, 'warnings': {...}}。
+
+    blocking 是带病成套的硬伤（缺答案 / 选项数异常 / 答案字母越界 /
+    解析为空且无图 / 整题重复 / 题干过短），调用方必须整套转人工；
+    warnings 是可疑但不拦的项（正文提到图/表却没挂图、解析过短、
+    选项过长疑似并行）。
+    """
+    blocking, warns = {}, {}
+
+    def add(d, code, i):
+        d.setdefault(code, []).append(i)
+
+    seen = {}
+    for i, q in enumerate(qs, 1):
+        ans = q.get('answer') or []
+        opts = q.get('options') or []
+        stem = (q.get('stem') or '').strip()
+        exp = (q.get('explanation') or '').strip()
+        if q.get('type') != 'essay':
+            if not ans:
+                add(blocking, 'no_answer', i)
+            if not (2 <= len(opts) <= 6):
+                add(blocking, 'bad_options', i)
+            elif ans and any(ord(a) - 65 >= len(opts) for a in ans):
+                add(blocking, 'answer_out_of_range', i)
+        if not exp and not q.get('exp_images'):
+            add(blocking, 'empty_explanation', i)
+        if len(stem) < 6:
+            add(blocking, 'stem_too_short', i)
+        key = (stem, tuple(o.get('text', '') for o in opts), tuple(ans))
+        if stem and key in seen:
+            add(blocking, 'dup_question', i)
+        seen[key] = i
+        if _FIG_REF_PAT.search(stem) and not q.get('images'):
+            add(warns, 'stem_fig_ref_no_image', i)
+        if _FIG_REF_PAT.search(exp) and not q.get('exp_images') and len(exp) < 120:
+            add(warns, 'exp_fig_ref_no_image', i)
+        if 0 < len(exp) <= 2:
+            add(warns, 'exp_too_short', i)
+        if any(len(o.get('text', '')) > 300 for o in opts):
+            add(warns, 'option_too_long', i)
+    return {'blocking': blocking, 'warnings': warns}
+
+
 def resolve_empty_explanations(qs):
     """解析为空硬规定的收尾：图/表已挂上的，解析填引导语；仍为空的列出。
 
