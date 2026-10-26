@@ -370,6 +370,11 @@ def _donation_total(email):
     return row['t'] or 0
 
 
+def _daily_limit(email):
+    """每日上传上限：普通 5 套；累计打赏 10 元以上（不含 10 元）20 套（2026-10-26 用户定）。"""
+    return 20 if _donation_total(email) > 10 else DAILY_UPLOAD_LIMIT
+
+
 @app.get('/api/me')
 def me():
     if session.get('uid'):
@@ -641,8 +646,9 @@ def upload_pdf():
     d = db()
     today_n = d.execute("SELECT COUNT(*) AS c FROM uploads WHERE email=? AND date(created_at)=date('now')",
                         (email,)).fetchone()['c']
-    if today_n >= DAILY_UPLOAD_LIMIT:
-        return jsonify({'ok': False, 'msg': '今天上传次数已达上限（%d 套），明天再来' % DAILY_UPLOAD_LIMIT}), 429
+    limit = _daily_limit(email)
+    if today_n >= limit:
+        return jsonify({'ok': False, 'msg': '今天上传次数已达上限（%d 套），明天再来' % limit}), 429
     cur = d.execute('INSERT INTO uploads(email, category, subject_title, title, filename, answer_filename, status)'
                     ' VALUES (?, ?, ?, ?, ?, ?, ?)',
                     (email, category, subject_title, title, f.filename, ans_name, 'parsing'))
@@ -692,7 +698,7 @@ def upload_info():
     today_used = d.execute("SELECT COUNT(*) AS c FROM uploads WHERE email=? AND date(created_at)=date('now')",
                            (session.get('email'),)).fetchone()['c']
     return jsonify({'ok': True, 'queue_total': queue_total, 'today_used': today_used,
-                    'daily_limit': DAILY_UPLOAD_LIMIT})
+                    'daily_limit': _daily_limit(session.get('email'))})
 
 
 @app.get('/api/my_uploads')
