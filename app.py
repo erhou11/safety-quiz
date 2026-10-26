@@ -375,6 +375,13 @@ def _daily_limit(email):
     return 20 if _donation_total(email) > 10 else DAILY_UPLOAD_LIMIT
 
 
+_TIER_RANK = {'普通用户': 0, '青铜贵宾': 1, '白银贵宾': 2, '黄金贵宾': 3, '紫金贵宾': 4}
+
+
+def _tier_rank(total):
+    return _TIER_RANK[_vip_tier(total)[0]]
+
+
 @app.get('/api/me')
 def me():
     if session.get('uid'):
@@ -695,10 +702,15 @@ def upload_info():
         return jsonify({'ok': False, 'msg': '请先登录'}), 401
     d = db()
     queue_total = d.execute("SELECT COUNT(*) AS c FROM uploads WHERE status='need_review'").fetchone()['c']
+    email = session.get('email')
     today_used = d.execute("SELECT COUNT(*) AS c FROM uploads WHERE email=? AND date(created_at)=date('now')",
-                           (session.get('email'),)).fetchone()['c']
+                           (email,)).fetchone()['c']
+    limit = _daily_limit(email)
+    total = _donation_total(email)
+    tier, color = _vip_tier(total)
     return jsonify({'ok': True, 'queue_total': queue_total, 'today_used': today_used,
-                    'daily_limit': _daily_limit(session.get('email'))})
+                    'daily_limit': limit, 'remaining': max(0, limit - today_used),
+                    'vip_tier': tier, 'vip_color': color, 'donation_total': total})
 
 
 @app.get('/api/my_uploads')
@@ -706,9 +718,21 @@ def my_uploads():
     if not session.get('uid'):
         return jsonify({'ok': False, 'msg': '请先登录'}), 401
     d = db()
-    queue_ids = [r['id'] for r in d.execute(
-        "SELECT id FROM uploads WHERE status='need_review' ORDER BY id").fetchall()]
-    queue_pos = {qid: i for i, qid in enumerate(queue_ids)}
+    # 人工审核排队位置（贵宾插队规则，2026-10-26 用户定）：等级高→低，同等级按提交时间先后
+    pend = d.execute("SELECT id, email FROM uploads WHERE status='need_review' ORDER BY id").fetchall()
+    _totals = {}
+
+    def _rank(email):
+        if email not in _totals:
+            _totals[email] = _tier_rank(_donation_total(email))
+        return _totals[email]
+
+    queue_pos = {}
+    for v in pend:
+        rv = _rank(v['email'])
+        queue_pos[v['id']] = sum(1 for o in pend
+                                 if _rank(o['email']) > rv
+                                 or (_rank(o['email']) == rv and o['id'] < v['id']))
     rows = d.execute('SELECT id, category, subject_title, title, filename, answer_filename, status, summary, set_id, created_at'
                         ' FROM uploads WHERE email=? ORDER BY id DESC LIMIT 50',
                         (session.get('email'),)).fetchall()
@@ -720,6 +744,7 @@ def my_uploads():
             ahead = queue_pos[item['id']]
             item['queue_ahead'] = ahead
             item['eta_hours'] = min(72, (ahead + 1) * 12)
+            item['is_vip'] = _donation_total(session.get('email')) > 0
         out.append(item)
     return jsonify(out)
 

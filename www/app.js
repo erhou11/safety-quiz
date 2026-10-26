@@ -688,10 +688,16 @@ function renderUpload() {
   api('upload_info').then(info => {
     const el = $('#up-live');
     if (!el || !info || !info.ok) return;
-    const queue = info.queue_total > 0
-      ? `当前有 ${info.queue_total} 套正在排队等待人工审核`
-      : '当前没有排队，上传后很快就能处理';
-    el.textContent = `${queue} · 您今日已上传 ${info.today_used} / ${info.daily_limit} 套`;
+    const isVip = info.vip_tier && info.vip_tier !== '普通用户';
+    const tierHtml = isVip ? `<b style="color:${info.vip_color}">${info.vip_tier}</b>` : '普通用户';
+    let s = `您是${tierHtml} · 今日已上传 ${info.today_used} / ${info.daily_limit} 套，还可上传 ${info.remaining} 套`;
+    if (info.queue_total > 0) {
+      s += ` · 当前共 ${info.queue_total} 套在排队`;
+      s += isVip ? '，您是贵宾，按等级优先处理（同等级按提交顺序）' : '（贵宾优先），您的排队位置见下方「我的上传」';
+    } else {
+      s += ' · 当前没有排队，上传后很快就能处理';
+    }
+    el.innerHTML = s;
   }).catch(() => {});
 }
 function fillSubjectList() {
@@ -720,7 +726,7 @@ async function loadMyUploads() {
     if (r.status === 'ready' || r.status === 'done') meta += `<br>共 ${sm.total || 0} 题（单选 ${sm.single || 0} / 多选 ${sm.multi || 0}）`;
     if (sm.warnings && sm.warnings.length) meta += '<br>⚠ ' + sm.warnings.join('；');
     if (r.status === 'need_review' && typeof r.queue_ahead === 'number')
-      meta += `<br>⏳ 人工审核排队中：前面还有 ${r.queue_ahead} 套，预计约 ${r.eta_hours} 小时内完成`;
+      meta += `<br>⏳ 人工审核排队中：前面还有 ${r.queue_ahead} 套，预计约 ${r.eta_hours} 小时内完成${r.is_vip ? ' · 贵宾优先' : ''}`;
     div.innerHTML = '<div class="up-t"></div><div class="up-m"></div>';
     div.querySelector('.up-t').innerHTML = '';
     div.querySelector('.up-t').textContent = r.title;
