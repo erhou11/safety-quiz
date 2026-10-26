@@ -710,6 +710,93 @@ def _pipeline_notify(up_id, src_pdf, orig_name, email, category, subject_title,
         pass
 
 
+def _board_update(text=None, task_id=None, task_status=None):
+    """给流水线黑板留言 / 改某个任务的状态（加锁、尽力而为，失败不影响主流程）。"""
+    pdir = os.environ.get('PIPELINE_DIR', '/opt/quizapp-pipeline')
+    bb_path = os.path.join(pdir, 'blackboard.json')
+    if not os.path.exists(bb_path):
+        return
+    lock = os.path.join(pdir, 'blackboard.lock')
+    try:
+        os.mkdir(lock)
+    except FileExistsError:
+        return
+    except OSError:
+        return
+    try:
+        with open(bb_path, encoding='utf-8') as f:
+            bb = json.load(f)
+        if task_id and task_status:
+            for t in bb.get('task_pool', []):
+                if t.get('id') == task_id:
+                    t['status'] = task_status
+        if text:
+            bb.setdefault('notes', []).append(
+                {'at': date.today().isoformat(), 'from': 'boss', 'text': text})
+        with open(bb_path, 'w', encoding='utf-8') as f:
+            json.dump(bb, f, ensure_ascii=False, indent=1)
+    except Exception:
+        pass
+    finally:
+        try:
+            os.rmdir(lock)
+        except OSError:
+            pass
+
+
+def _reparse_stored_upload(row):
+    """复核用：对已存盘的原始 PDF 按上传时同一条管线（解析→拆选项→救解析→
+    图/表提取→体检硬门禁）重跑一遍。不改数据库；ready 时写好 staging JSON，
+    返回 (ready, info)：ready 时 info 带 summary；未过时带 blocking/still_empty。"""
+    up_id = row['id']
+    email = row['email']
+    pdf_path = os.path.join(UPLOAD_DIR, '%d.pdf' % up_id)
+    ans_path = os.path.join(UPLOAD_DIR, '%d_ans.pdf' % up_id)
+    if not row['answer_filename'] or not os.path.exists(ans_path):
+        ans_path = None
+    if not os.path.exists(pdf_path):
+        return False, {'total': 0, 'blocking': {'missing_file': []}}
+    text = upload_lib.extract_text(pdf_path)
+    if len(text.strip()) < 200:
+        return False, {'total': 0, 'blocking': {'no_text_layer': []}}
+    if ans_path:
+        qs, warnings = upload_lib.parse_pair(text, upload_lib.extract_text(ans_path))
+    else:
+        qs, warnings = upload_lib.parse_text(text)
+    if not qs:
+        return False, {'total': 0, 'blocking': {'unparsed': []}, 'warnings': warnings}
+    img_dir = os.path.join(BASE, 'www', 'imgup')
+    try:
+        upload_lib.split_inline_options(qs)
+        upload_lib.rescue_explanations(ans_path or pdf_path, qs)
+        upload_lib.attach_pdf_images(pdf_path, qs, img_dir,
+                                     'up%dq' % up_id, 'images', 'question')
+        upload_lib.attach_pdf_images(ans_path or pdf_path, qs, img_dir,
+                                     'up%d' % up_id, 'exp_images', 'answer')
+    except Exception:
+        pass
+    still_empty = upload_lib.resolve_empty_explanations(qs)
+    audit = upload_lib.audit_questions(qs)
+    blocking = audit.get('blocking') or {}
+    if still_empty or blocking:
+        return False, {'total': len(qs), 'blocking': blocking,
+                       'still_empty': still_empty}
+    with open(os.path.join(UPLOAD_DIR, '%d.json' % up_id), 'w', encoding='utf-8') as fh:
+        json.dump(qs, fh, ensure_ascii=False)
+    warnings = [w for w in warnings
+                if '解析为空（原卷可能为图片表格' not in w
+                and '选项数异常' not in w and '缺答案' not in w]
+    summary = {'total': len(qs),
+               'single': sum(1 for q in qs if q['type'] == 'single'),
+               'multi': sum(1 for q in qs if q['type'] == 'multi'),
+               'essay': sum(1 for q in qs if q['type'] == 'essay'),
+               'warnings': warnings}
+    library_match = _exact_library_match(email, qs)
+    if library_match:
+        summary['library_match'] = library_match
+    return True, {'total': len(qs), 'summary': summary}
+
+
 def _my_upload(up_id):
     if not session.get('uid'):
         return None
@@ -1107,6 +1194,7 @@ def my_uploads():
     for r in rows:
         item = dict(r)
         item['summary'] = json.loads(item['summary'] or '{}')
+        item['problems'] = item['summary'].get('problems') or []
         if item['status'] == 'need_review' and item['id'] in queue_pos:
             ahead = queue_pos[item['id']]
             item['queue_ahead'] = ahead
@@ -1190,6 +1278,45 @@ def upload_confirm(up_id):
     return jsonify({'ok': True, 'set': sid, 'total': len(ns)})
 
 
+@app.post('/api/upload/<int:up_id>/confirm_ok')
+def upload_confirm_ok(up_id):
+    """三审入口（2026-10-26 用户定）：defect（原文件缺陷待确认）的卷子，
+    上传者点「已确认，题目无误」后触发。先按原管线自动复核一遍：过了恢复
+    待确认生成；仍不过转 owner_review 站长终审队列，并留言通知总管三审。"""
+    row = _my_upload(up_id)
+    if row is None:
+        return jsonify({'ok': False, 'msg': '记录不存在或无权操作'}), 404
+    if row['status'] != 'defect':
+        return jsonify({'ok': False, 'msg': '该上传不在待确认状态'}), 400
+    ready, info = _reparse_stored_upload(row)
+    d = db()
+    if ready:
+        d.execute('UPDATE uploads SET status=?, summary=? WHERE id=?',
+                  ('ready', json.dumps(info['summary'], ensure_ascii=False), up_id))
+        d.commit()
+        _board_update(text='U-%d 上传者已确认题目无误，自动复核通过（%d 题），已恢复待确认生成。'
+                           % (up_id, info['total']),
+                      task_id='U-%d' % up_id, task_status='done')
+        return jsonify({'ok': True, 'status': 'ready',
+                        'msg': '复核通过，已恢复为待确认生成'})
+    try:
+        summary = json.loads(row['summary'] or '{}')
+    except Exception:
+        summary = {}
+    summary['recheck'] = {'at': date.today().isoformat(),
+                          'blocking': info.get('blocking') or {},
+                          'total': info.get('total', 0)}
+    d.execute('UPDATE uploads SET status=?, summary=? WHERE id=?',
+              ('owner_review', json.dumps(summary, ensure_ascii=False), up_id))
+    d.commit()
+    probs = summary.get('problems') or []
+    _board_update(text='@总管 U-%d 上传者坚持题目无误，自动复核仍未通过，已转站长终审队列，'
+                       '请三审：逐页核对原文件，仍有问题就把原卷打包发站长亲审。问题：%s'
+                       % (up_id, '；'.join(probs) or '见体检结果'),
+                  task_id='U-%d' % up_id, task_status='owner_review')
+    return jsonify({'ok': True, 'status': 'owner_review', 'msg': '已提交站长终审'})
+
+
 @app.post('/api/upload/<int:up_id>/discard')
 def upload_discard(up_id):
     row = _my_upload(up_id)
@@ -1207,6 +1334,9 @@ def upload_discard(up_id):
     p = os.path.join(UPLOAD_DIR, '%d_ans.pdf' % up_id)
     if os.path.exists(p):
         os.remove(p)
+    if row['status'] in ('need_review', 'defect', 'owner_review', 'owner_final'):
+        _board_update(text='U-%d 已被上传者放弃并删除，任务关闭。' % up_id,
+                      task_id='U-%d' % up_id, task_status='closed')
     return jsonify({'ok': True})
 
 

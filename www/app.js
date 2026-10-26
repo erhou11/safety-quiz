@@ -651,7 +651,7 @@ $('#auth-submit').onclick = async () => {
 $('#auth-password').addEventListener('keydown', e => { if (e.key === 'Enter') $('#auth-submit').click(); });
 
 // ---------- 上传题库 ----------
-const UP_STATUS = { parsing: ['解析中', ''], ready: ['待确认生成', 'ready'], need_review: ['等待人工审核', 'review'], done: ['已生成套题', 'ready'] };
+const UP_STATUS = { parsing: ['解析中', ''], ready: ['待确认生成', 'ready'], need_review: ['等待人工审核', 'review'], defect: ['待你确认', 'review'], owner_review: ['复核中', 'review'], owner_final: ['站长亲审中', 'review'], done: ['已生成套题', 'ready'] };
 $('#btn-upload').onclick = () => { show('upload'); renderUpload(); };
 $('#promo-upload').onclick = () => {
   // 首页宣传卡大按钮：已登录直达上传页，未登录先去登录/注册
@@ -733,6 +733,13 @@ async function loadMyUploads() {
     if (sm.warnings && sm.warnings.length) meta += '<br>⚠ ' + sm.warnings.join('；');
     if (r.status === 'need_review' && typeof r.queue_ahead === 'number')
       meta += `<br>⏳ 人工审核排队中：前面还有 ${r.queue_ahead} 套，预计约 ${r.eta_hours} 小时内完成${r.is_vip ? ' · 贵宾优先' : ''}`;
+    if (r.status === 'defect') {
+      const ps = (r.problems && r.problems.length) ? r.problems : ['原文件有问题，详见审核结果'];
+      meta += '<br>⚠ 审核发现这份卷子本身有问题，需要你确认：' + ps.map(p => '<br>· ' + p).join('');
+      meta += '<br>请核对原文件：确实有问题就点「放弃上传」；确认原文件无误就点「已确认，题目无误」，我们会再复核一遍。';
+    }
+    if (r.status === 'owner_review') meta += '<br>⏳ 你已确认题目无误，正在复核中…';
+    if (r.status === 'owner_final') meta += '<br>⏳ 复核后仍有问题，已转站长亲自审核，请等站长处理';
     div.innerHTML = '<div class="up-t"></div><div class="up-m"></div>';
     div.querySelector('.up-t').innerHTML = '';
     div.querySelector('.up-t').textContent = r.title;
@@ -769,8 +776,20 @@ async function loadMyUploads() {
       };
       acts.appendChild(bOpen);
     }
-    if (r.status === 'ready' || r.status === 'need_review') {
-      const b2 = document.createElement('button'); b2.textContent = '放弃'; b2.className = 'ghost';
+    if (r.status === 'defect') {
+      const bOk = document.createElement('button'); bOk.textContent = '已确认，题目无误';
+      bOk.onclick = async () => {
+        if (!confirm('确认原文件题目无误？提交后我们会再复核一遍。')) return;
+        const res = await api('upload/' + r.id + '/confirm_ok', { method: 'POST' });
+        if (res.ok && res.status === 'ready') alert('复核通过，已恢复为待确认生成');
+        else if (res.ok) alert('已提交站长终审');
+        else alert(res.msg || '提交失败');
+        loadMyUploads();
+      };
+      acts.appendChild(bOk);
+    }
+    if (r.status === 'ready' || r.status === 'need_review' || r.status === 'defect') {
+      const b2 = document.createElement('button'); b2.textContent = r.status === 'defect' ? '放弃上传' : '放弃'; b2.className = 'ghost';
       b2.onclick = async () => {
         if (!confirm('放弃这份上传？')) return;
         await api('upload/' + r.id + '/discard', { method: 'POST' });
