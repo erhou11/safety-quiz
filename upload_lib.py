@@ -19,7 +19,16 @@
 按原卷重解析一遍，取问题更少的结果为准；仍修不好的才保留警告转人工。
 起因：某 106 题消防卷因页脚广告行与「B 」空格标号变体被拆成 110 题、
 答案错位，复核模式可完整还原。
+
+解析为空硬规定（2026-10-26 用户定）：任何上传只要有题解析为空，不许直接
+下「原书没给解析」的结论，也不许静默成套——必须再拿原文件逐页核对：
+答案册里的解析常是扫描图片表格，文字层提取不到，须扫描每道题条目区间
+内的图片（宽 ≥150pt），把图/表裁出来挂到该题 exp_images；题面 PDF 里的
+图/表同理挂到 images。图/表补上后解析仍为空的，转人工核对，不直接成套。
+起因：破题系列 8 道题的解析是整张图片表格，曾被误判为「原书未给解析」，
+另有 31 道题文字解析在、关键表格丢失。
 """
+import os
 import re
 
 _SPLIT_PAT = re.compile(r'^(答案解析|参考答案|答案与解析|答案及解析)\s*$')
@@ -241,3 +250,158 @@ def parse_pair(q_text, a_text=None):
 def parse_text(text):
     """单文件解析（题面+答案同在一个 PDF）：parse_pair 的兼容入口。"""
     return parse_pair(text, None)
+
+
+# ---------------------------------------------------------------------------
+# 图/表提取（硬规定）：文字层之外，把原文件里的图片表格按题裁出来挂上。
+# 答案 PDF 的图 -> exp_images，题面 PDF 的图 -> images。
+# ---------------------------------------------------------------------------
+
+_ANS_HEAD_PAT = re.compile(r'^(\d{1,3})\s*[、.．]\s*(?:答案\s*[:：]\s*)?([A-E]{1,6})(?![A-Za-z0-9])')
+_IMG_MIN_W = 150      # 表格/示意图的最小宽度（pt）；页眉 logo、图标远小于此
+_IMG_MIN_H = 25
+
+
+def _page_lines(page):
+    """一页的文字行 -> [(y0, x0, text)]，按阅读顺序（先纵后横）。"""
+    out = []
+    try:
+        d = page.get_text('dict')
+    except Exception:
+        return out
+    for block in d.get('blocks', []):
+        if block.get('type') != 0:
+            continue
+        for line in block.get('lines', []):
+            text = ''.join(s.get('text', '') for s in line.get('spans', [])).strip()
+            if text:
+                x0, y0 = line['bbox'][0], line['bbox'][1]
+                out.append((y0, x0, text))
+    out.sort()
+    return out
+
+
+def _find_entries(doc, kind):
+    """按页扫描条目题头 -> [(印刷题号, 页序, y0)]（文档顺序）。
+
+    kind='answer' 认答案条目头（「N、答案：A」或紧凑式「N. ABC」）；
+    kind='question' 认题面题头（「N、…」）。
+    题号须与上一个已认题头衔接（允许漏检 3 个以内自动再同步），解析正文里
+    「1. A 选项…」这类行内编号因题号回跳会被丢弃，不会冒充条目头。
+    """
+    entries = []
+    expected = None
+    for pno in range(len(doc)):
+        for y0, _x0, text in _page_lines(doc[pno]):
+            if kind == 'answer':
+                m = _ANS_HEAD_PAT.match(text)
+            else:
+                m = _Q_PAT.match(text)
+            if not m:
+                continue
+            num = int(m.group(1))
+            if expected is None or expected <= num <= expected + 3:
+                entries.append((num, pno, y0))
+                expected = num + 1
+    return entries
+
+
+def attach_pdf_images(pdf_path, qs, out_dir, prefix, field, kind):
+    """把 pdf_path 中宽 ≥150pt 的图片裁出，按条目区间归属挂到 qs 的 field。
+
+    prefix 为文件名前缀（如 'up17'），图片存 out_dir、URL 为 'imgup/<文件名>'。
+    返回实际挂图数。条目头检出太少（不足题目数一半）时归属不可靠，宁可
+    一张不挂、返回 0，留给「解析为空转人工」兜底，绝不乱挂。
+    """
+    if not pdf_path or not qs:
+        return 0
+    try:
+        import pymupdf
+        doc = pymupdf.open(pdf_path)
+    except Exception:
+        return 0
+    entries = _find_entries(doc, kind)
+    if len(entries) < max(1, len(qs) // 2):
+        doc.close()
+        return 0
+    # 印刷题号 -> 题目序号：优先用条目头在文档中的次序（第 k 个条目头即第 k 题），
+    # 与 parse_pair 的输出次序一致；次序对不上时退回「题号-首题号+1」。
+    by_order = {num: i + 1 for i, (num, _p, _y) in enumerate(entries)}
+    first_num = entries[0][0]
+
+    def seq_of(num):
+        s = by_order.get(num)
+        if s is not None and s <= len(qs):
+            return s
+        s = num - first_num + 1
+        return s if 1 <= s <= len(qs) else None
+
+    os.makedirs(out_dir, exist_ok=True)
+    attached = 0
+    seen = set()
+    per_q = {}
+    for pno in range(len(doc)):
+        page = doc[pno]
+        pw, ph = page.rect.width, page.rect.height
+        for img in page.get_images(full=True):
+            xref = img[0]
+            try:
+                rects = page.get_image_rects(xref)
+            except Exception:
+                continue
+            for rect in rects:
+                key = (pno, xref, round(rect.x0), round(rect.y0))
+                if key in seen:
+                    continue
+                seen.add(key)
+                if rect.width < _IMG_MIN_W or rect.height < _IMG_MIN_H:
+                    continue
+                if rect.width > pw * 0.92 and rect.height > ph * 0.85:
+                    continue  # 整页扫描底图，不是题内图/表
+                if rect.y0 < 45 and rect.height < 60:
+                    continue  # 页眉 logo / 装饰
+                owner = None
+                for num, ep, ey in entries:
+                    if ep < pno or (ep == pno and ey <= rect.y0 + 5):
+                        owner = num
+                    else:
+                        break
+                if owner is None:
+                    continue
+                seq = seq_of(owner)
+                if seq is None:
+                    continue
+                clip = pymupdf.Rect(max(0, rect.x0 - 2), max(0, rect.y0 - 26),
+                                    min(pw, rect.x1 + 2), min(ph, rect.y1 + 4))
+                k = per_q.get(seq, 0) + 1
+                per_q[seq] = k
+                fname = '%s-%d-%d.png' % (prefix, seq, k)
+                try:
+                    pix = page.get_pixmap(clip=clip, dpi=200)
+                    pix.save(os.path.join(out_dir, fname))
+                except Exception:
+                    continue
+                qs[seq - 1].setdefault(field, [])
+                url = 'imgup/' + fname
+                if url not in qs[seq - 1][field]:
+                    qs[seq - 1][field].append(url)
+                    attached += 1
+    doc.close()
+    return attached
+
+
+def resolve_empty_explanations(qs):
+    """解析为空硬规定的收尾：图/表已挂上的，解析填引导语；仍为空的列出。
+
+    返回 still_empty（1 起序号列表）——这些题已按原文件核过文字与图/表
+    仍无解析，调用方必须转人工核对，不得直接成套。
+    """
+    still = []
+    for i, q in enumerate(qs, 1):
+        if (q.get('explanation') or '').strip():
+            continue
+        if q.get('exp_images'):
+            q['explanation'] = '原书本题解析为图/表，文字层无内容，图/表已随题附上（见下图）。'
+        else:
+            still.append(i)
+    return still

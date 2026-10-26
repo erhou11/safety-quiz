@@ -957,6 +957,24 @@ def upload_pdf():
         else:
             qs, warnings = upload_lib.parse_text(text)
 
+    # 图/表一起提取（2026-10-26 用户定）：文字层之外，题面 PDF 的图/表挂 images、
+    # 答案 PDF 的图/表挂 exp_images。解析为空硬规定：只要有题解析为空，必须先
+    # 按原文件逐页核过图/表再下结论；图/表补上后仍为空的转人工，不直接成套。
+    still_empty = []
+    if qs and not reused:
+        img_dir = os.path.join(BASE, 'www', 'imgup')
+        try:
+            upload_lib.attach_pdf_images(pdf_path, qs, img_dir,
+                                         'up%dq' % up_id, 'images', 'question')
+            upload_lib.attach_pdf_images(ans_path or pdf_path, qs, img_dir,
+                                         'up%d' % up_id, 'exp_images', 'answer')
+        except Exception:
+            pass
+        still_empty = upload_lib.resolve_empty_explanations(qs)
+        if still_empty:
+            warnings.append('第 %s 题解析为空：已按原文件逐页核对文字与图/表仍未找到，转人工核对'
+                            % ','.join(map(str, still_empty[:10])))
+
     if qs:
         if library_match is None:
             # 解析结果先落 staging JSON（确认生成引用套时不会写入题库，仅作兜底），
@@ -980,9 +998,18 @@ def upload_pdf():
             library_dup = _public_library_dup(email, qs)
             if library_dup:
                 summary['library_dup'] = library_dup
-        d.execute('UPDATE uploads SET status=?, summary=? WHERE id=?',
-                  ('ready', json.dumps(summary, ensure_ascii=False), up_id))
-        status = 'ready'
+        # 解析为空硬规定：核过原文件仍无解析且非题库引用命中的，转人工核对。
+        if still_empty and not library_match:
+            summary['empty_exp_review'] = still_empty
+            d.execute('UPDATE uploads SET status=?, summary=? WHERE id=?',
+                      ('need_review', json.dumps(summary, ensure_ascii=False), up_id))
+            status = 'need_review'
+            _pipeline_notify(up_id, pdf_path, f.filename, email, category, subject_title,
+                             ans_pdf=ans_path, ans_name=ans_name)
+        else:
+            d.execute('UPDATE uploads SET status=?, summary=? WHERE id=?',
+                      ('ready', json.dumps(summary, ensure_ascii=False), up_id))
+            status = 'ready'
     else:
         summary = {'total': 0, 'warnings': warnings}
         d.execute('UPDATE uploads SET status=?, summary=? WHERE id=?',
