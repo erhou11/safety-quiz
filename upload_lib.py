@@ -187,6 +187,10 @@ def _finish(qs, ans, warnings):
         warnings.append('第 %s 题缺答案' % ','.join(map(str, no_ans[:10])))
     if bad_opt:
         warnings.append('第 %s 题选项数异常' % ','.join(map(str, bad_opt[:10])))
+    no_exp = [i + 1 for i, q in enumerate(out) if not (q.get('explanation') or '').strip()]
+    if no_exp:
+        warnings.append('第 %s 题解析为空（原卷可能为图片表格，需人工核对）'
+                        % ','.join(map(str, no_exp[:10])))
     flagged = len(no_ans) + len(bad_opt)
     if len(no_ans) > max(1, len(out) // 5) or len(bad_opt) > max(1, len(out) // 5):
         return [], warnings + ['缺答案/选项异常比例过高，转人工'], flagged
