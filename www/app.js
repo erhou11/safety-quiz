@@ -39,9 +39,7 @@ function renderCategoryTabs() {
       if (curCategory === c.id) return;
       curCategory = c.id;
       localStorage.setItem('quiz_category', curCategory);
-      const ss = categorySets();
-      curSet = ss.length ? ss[0].id : null;
-      localStorage.setItem('quiz_set', curSet || '');
+      curSet = null;
       renderPractice();
     };
     box.appendChild(b);
@@ -75,18 +73,47 @@ function categorySets() {
     .sort((a, b) => (subjIdx[a.subject] ?? 99) - (subjIdx[b.subject] ?? 99));
 }
 
-// 套题自定义排序 (localStorage, 按类别存)
+function subjectSets() {
+  return setsMeta.filter(s => s.subject === curSubject);
+}
+
+function subjectsWithSets() {
+  // 科目选择只列「有可见套题」的科目，没题的科目不出现（与类别显隐同一规矩）
+  const have = new Set(categorySets().map(s => s.subject));
+  return categorySubjects().filter(s => have.has(s.id));
+}
+
+function renderSubjectTabs() {
+  const box = $('#subject-tabs'); box.innerHTML = '';
+  subjectsWithSets().forEach(s => {
+    const b = document.createElement('button');
+    b.className = 'subj-tab' + (s.id === curSubject ? ' active' : '');
+    b.textContent = s.title;
+    b.onclick = () => {
+      if (curSubject === s.id) return;
+      curSubject = s.id;
+      localStorage.setItem('quiz_subject', curSubject);
+      const ss = subjectSets();
+      curSet = ss.length ? ss[0].id : null;
+      localStorage.setItem('quiz_set', curSet || '');
+      renderPractice();
+    };
+    box.appendChild(b);
+  });
+}
+
+// 套题自定义排序 (localStorage, 按科目存)
 function getSetOrder() {
   try {
-    const o = JSON.parse(localStorage.getItem('quiz_set_order_cat_' + curCategory) || '[]');
+    const o = JSON.parse(localStorage.getItem('quiz_set_order_' + curSubject) || '[]');
     return Array.isArray(o) ? o : [];
   } catch (e) { return []; }
 }
 function saveSetOrder(ids) {
-  localStorage.setItem('quiz_set_order_cat_' + curCategory, JSON.stringify(ids));
+  localStorage.setItem('quiz_set_order_' + curSubject, JSON.stringify(ids));
 }
 function orderedSets() {
-  const ss = categorySets();
+  const ss = subjectSets();
   const order = getSetOrder();
   if (!order.length) return ss;
   const pos = {};
@@ -125,10 +152,9 @@ function renderSetTabs() {
     else if (done > 0) { stEl.textContent = '未做完'; stEl.classList.add('doing'); }
     else { stEl.textContent = '未做'; stEl.classList.add('todo'); }
     b.onclick = () => {
-      if (curSet === s.id) return;
       curSet = s.id;
       localStorage.setItem('quiz_set', curSet);
-      renderPractice();
+      show('set'); renderSetPage();
     };
     box.appendChild(b);
   });
@@ -242,19 +268,23 @@ function updateStartBtn() {
 }
 
 async function renderPractice() {
+  // 刷题页只做选择：先选科目（只列有题的），再选套题；详情与模式在套题页
   renderCategoryTabs();
-  const ss = categorySets();
+  const subs = subjectsWithSets();
+  if (!subs.some(s => s.id === curSubject)) curSubject = subs.length ? subs[0].id : null;
+  if (curSubject) localStorage.setItem('quiz_subject', curSubject);
+  renderSubjectTabs();
+  const ss = subjectSets();
   if (!ss.some(s => s.id === curSet)) curSet = ss.length ? ss[0].id : null;
-  if (curSet) {
-    const sel = setsMeta.find(x => x.id === curSet);
-    if (sel) curSubject = sel.subject;
-  }
+  localStorage.setItem('quiz_set', curSet || '');
+  if (curSet) curSubject = setsMeta.find(x => x.id === curSet)?.subject || curSubject;
   renderSetTabs();
-  const hasSets = !!curSet;
-  document.querySelector('.hero').classList.toggle('hidden', !hasSets);
-  document.querySelector('.cards').classList.toggle('hidden', !hasSets);
-  if (!hasSets) return;
+}
+
+async function renderSetPage() {
   const s = setsMeta.find(x => x.id === curSet);
+  if (!s) { show('practice'); renderPractice(); return; }
+  curSubject = s.subject;
   $('#set-kicker').textContent = s.kicker;
   $('#set-title').textContent = s.title;
   $('#set-desc').textContent = s.desc;
@@ -499,7 +529,7 @@ $('#q-next').onclick = () => {
   if (pos < order.length - 1) { pos++; picked = []; renderQ(); }
   else finishRound();
 };
-$('#q-back').onclick = () => { clearQuizHash(); show('practice'); renderPractice(); };
+$('#q-back').onclick = () => { clearQuizHash(); show('set'); renderSetPage(); };
 
 // 进度条点击/拖拽跳转：按位置比例定位到对应题目
 const progBar = document.querySelector('.qprog');
@@ -606,6 +636,7 @@ $('#btn-start').onclick = () => {
   else $('#btn-auth').click();
 };
 $('#pr-back').onclick = () => { show('home'); loadHome(); };
+$('#set-back').onclick = () => { show('practice'); renderPractice(); };
 $('#up-back').onclick = () => { show('home'); loadHome(); };
 
 function renderUpload() {
