@@ -783,21 +783,55 @@ async function loadMyUploads() {
   });
 }
 
+// 文件一选中就把内容读进内存：部分手机浏览器（鸿蒙上的 Chrome/Edge）
+// 选完第二个文件后，第一个文件的读取许可会失效，提交时再回头读文件
+// 会直接报错「网络异常」且请求发不出去。提前读进内存，提交时从内存发，
+// 不再碰可能已失效的文件句柄。
+const _upCache = {};
+function _captureUploadFile(inputSel, key) {
+  const inp = $(inputSel);
+  if (!inp) return;
+  inp.addEventListener('change', () => {
+    const f = inp.files && inp.files[0];
+    if (!f) { delete _upCache[key]; return; }
+    const entry = { name: f.name, size: f.size, blob: null, promise: null };
+    entry.promise = f.arrayBuffer().then(buf => {
+      entry.blob = new Blob([buf], { type: 'application/pdf' });
+      return entry.blob;
+    }).catch(() => null);
+    _upCache[key] = entry;
+  });
+}
+_captureUploadFile('#up-file', 'main');
+_captureUploadFile('#up-file-ans', 'ans');
+async function _pickedFile(inputSel, key) {
+  const inp = $(inputSel);
+  const f = inp && inp.files && inp.files[0];
+  if (!f) return null;
+  const c = _upCache[key];
+  if (c && c.name === f.name && c.size === f.size) {
+    const blob = await c.promise;
+    if (blob) return { blob: blob, name: f.name };
+  }
+  return { blob: f, name: f.name };
+}
+
 $('#up-submit').onclick = async () => {
   const err = $('#up-err'); err.textContent = '';
-  const file = $('#up-file').files[0];
   const subject = $('#up-subject').value.trim();
   if (!subject) { err.textContent = '请选择科目 / 专业'; return; }
-  if (!file) { err.textContent = '请选择 PDF 文件'; return; }
-  const fd = new FormData();
-  fd.append('file', file);
-  const ansFile = $('#up-file-ans').files[0];
-  if (ansFile) fd.append('answer_file', ansFile);
-  fd.append('category', $('#up-category').value);
-  fd.append('subject_title', subject);
-  fd.append('title', $('#up-title').value.trim());
+  if (!($('#up-file').files && $('#up-file').files[0])) { err.textContent = '请选择 PDF 文件'; return; }
   $('#up-submit').disabled = true;
   try {
+    const main = await _pickedFile('#up-file', 'main');
+    if (!main) { err.textContent = '请选择 PDF 文件'; return; }
+    const fd = new FormData();
+    fd.append('file', main.blob, main.name);
+    const ans = await _pickedFile('#up-file-ans', 'ans');
+    if (ans) fd.append('answer_file', ans.blob, ans.name);
+    fd.append('category', $('#up-category').value);
+    fd.append('subject_title', subject);
+    fd.append('title', $('#up-title').value.trim());
     const r = await fetch('/api/upload', { method: 'POST', body: fd });
     const res = await r.json();
     if (!res.ok) { err.textContent = res.msg || '上传失败'; return; }
