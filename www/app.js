@@ -600,6 +600,11 @@ $('#auth-password').addEventListener('keydown', e => { if (e.key === 'Enter') $(
 // ---------- 上传题库 ----------
 const UP_STATUS = { parsing: ['解析中', ''], ready: ['待确认生成', 'ready'], need_review: ['等待人工审核', 'review'], done: ['已生成套题', 'ready'] };
 $('#btn-upload').onclick = () => { show('upload'); renderUpload(); };
+$('#promo-upload').onclick = () => {
+  // 首页宣传卡大按钮：已登录直达上传页，未登录先去登录/注册
+  if (!$('#btn-upload').classList.contains('hidden')) { show('upload'); renderUpload(); }
+  else $('#btn-auth').click();
+};
 $('#up-back').onclick = () => { show('home'); loadHome(); };
 
 function renderUpload() {
