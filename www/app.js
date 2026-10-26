@@ -576,6 +576,14 @@ function finishRound() {
   const fmt = n => (Math.round(n * 10) / 10).toString();
   $('#r-score').textContent = fmt(score) + ' / ' + fmt(maxScore) + ' 分';
   $('#r-detail').textContent = `单选答对 ${singleOk}/${singleTotal} 道 · 多选答对 ${multiOk}/${multiTotal} 道`;
+  const rate = maxScore > 0 ? score / maxScore : 0;
+  $('#r-ring').style.setProperty('--p', (rate * 100).toFixed(1));
+  $('#r-praise').textContent =
+    maxScore === 0 ? '这一轮没有计分题，看看错题本也不错' :
+    rate >= 1 ? '满分！这一轮稳稳拿下 🏆' :
+    rate >= 0.8 ? '很棒，正确率优秀，继续保持' :
+    rate >= 0.6 ? '不错，错题已收进错题本，记得回看' :
+    '完成一轮就是进步，错题本里见';
   show('result');
 }
 $('#r-retry').onclick = async () => { await api('reset', { method: 'POST', body: withSet(null, JSON.stringify({ mode })) }); startQuiz(mode, 0); };

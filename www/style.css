@@ -185,3 +185,22 @@ body{background:#131417;color:#e8e6e1;font-family:-apple-system,BlinkMacSystemFo
 .up-notice-t{color:#c9a24b;font-weight:700;font-size:14px;margin-bottom:6px}
 .up-notice p{color:#b9b6ac;font-size:13px;line-height:1.7;margin:0}
 .up-notice .up-live{color:#c9a24b;margin-top:8px;font-size:13px}
+
+/* 完成页美化：得分金环 + 渐变 + 入场动画 */
+#screen-result{text-align:center}
+.score-ring{--p:0;width:196px;height:196px;margin:16px auto 8px;border-radius:50%;background:conic-gradient(#c9a24b calc(var(--p)*1%),#26282e 0);display:flex;align-items:center;justify-content:center;box-shadow:0 0 44px rgba(201,162,75,.16)}
+.score-in{width:164px;height:164px;border-radius:50%;background:#101114;display:flex;align-items:center;justify-content:center;padding:0 10px}
+.score-in b{font-size:30px;line-height:1.3;background:linear-gradient(180deg,#ecd28a,#c9a24b);-webkit-background-clip:text;background-clip:text;color:transparent}
+#r-detail{color:#b9b6ac}
+#r-praise{color:#c9a24b;font-size:14.5px;min-height:22px;margin-top:2px}
+#screen-result .reward{border-top:none;background:linear-gradient(#17181b,#17181b) padding-box,linear-gradient(135deg,rgba(201,162,75,.65),rgba(201,162,75,.12)) border-box;border:1px solid transparent;border-radius:16px;padding:16px 14px 12px}
+#r-retry{background:linear-gradient(135deg,#dcbc65,#c9a24b);border-color:transparent}
+#r-retry .card-title{color:#191708;font-weight:700}
+#r-retry .card-go{color:#191708}
+#screen-result.active>*{animation:fadeUp .5s ease both}
+#screen-result.active>*:nth-child(2){animation-delay:.05s}
+#screen-result.active>*:nth-child(3){animation-delay:.1s}
+#screen-result.active>*:nth-child(4){animation-delay:.15s}
+#screen-result.active>*:nth-child(5){animation-delay:.2s}
+#screen-result.active>*:nth-child(6){animation-delay:.25s}
+@keyframes fadeUp{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
