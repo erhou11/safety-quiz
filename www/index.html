@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>注册安全工程师刷题</title>
 <link rel="icon" href="data:,">
-<link rel="stylesheet" href="style.css?v=30">
+<link rel="stylesheet" href="style.css?v=31">
 </head>
 <body>
 <div id="app">
@@ -117,6 +117,9 @@
       <input id="up-title" placeholder="不填则用文件名" maxlength="60">
       <label class="up-label">PDF 文件</label>
       <input id="up-file" type="file" accept="application/pdf,.pdf">
+      <label class="up-label">答案 PDF（可选）</label>
+      <input id="up-file-ans" type="file" accept="application/pdf,.pdf">
+      <p class="up-hint">试题和答案分开两个文件时，把答案卷传这里；都在一个文件里就不用传。</p>
       <div id="up-err" class="auth-err"></div>
       <button id="up-submit" class="submit">上传并解析</button>
       <div id="up-reward" class="reward hidden">
@@ -180,6 +183,6 @@
     </div>
   </section>
 </div>
-<script src="app.js?v=37"></script>
+<script src="app.js?v=38"></script>
 </body>
 </html>

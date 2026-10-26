@@ -159,6 +159,9 @@ def init_db():
         summary TEXT, set_id TEXT,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP);
     ''')
+    _cols = [r[1] for r in d.execute('PRAGMA table_info(uploads)').fetchall()]
+    if _cols and 'answer_filename' not in _cols:
+        d.execute('ALTER TABLE uploads ADD COLUMN answer_filename TEXT')
     # 迁移旧库：没有 set_id 列说明是旧表，重建（旧数据归为 s1）
     if not _has_col(d, 'answers', 'set_id'):
         _rebuild_with_set(d, 'answers', ['n', 'selected', 'correct', 'ts'], 'client, set_id, n')
@@ -519,7 +522,8 @@ def _save_questions_data():
     os.replace(tmp, os.path.join(BASE, 'questions_full.json'))
 
 
-def _pipeline_notify(up_id, src_pdf, orig_name, email, category, subject_title):
+def _pipeline_notify(up_id, src_pdf, orig_name, email, category, subject_title,
+                     ans_pdf=None, ans_name=None):
     """解析未过时把 PDF 登记进三 AI 流水线黑板（尽力而为，失败不影响主流程）。"""
     pdir = os.environ.get('PIPELINE_DIR', '/opt/quizapp-pipeline')
     inbox = os.path.join(pdir, 'inbox')
@@ -528,6 +532,10 @@ def _pipeline_notify(up_id, src_pdf, orig_name, email, category, subject_title):
     try:
         dst = os.path.join(inbox, 'U-%d-%s' % (up_id, os.path.basename(orig_name) or 'upload.pdf'))
         shutil.copyfile(src_pdf, dst)
+        ans_dst_name = None
+        if ans_pdf and os.path.exists(ans_pdf):
+            ans_dst_name = 'U-%d-答案-%s' % (up_id, os.path.basename(ans_name) or 'answer.pdf')
+            shutil.copyfile(ans_pdf, os.path.join(inbox, ans_dst_name))
         bb_path = os.path.join(pdir, 'blackboard.json')
         lock = os.path.join(pdir, 'blackboard.lock')
         try:
@@ -537,11 +545,14 @@ def _pipeline_notify(up_id, src_pdf, orig_name, email, category, subject_title):
         try:
             with open(bb_path, encoding='utf-8') as f:
                 bb = json.load(f)
-            bb.setdefault('task_pool', []).append({
+            task = {
                 'id': 'U-%d' % up_id, 'pdf': 'inbox/' + os.path.basename(dst),
                 'subject': subject_title, 'category': category, 'questions': 0,
                 'status': 'pending', 'from_upload': True, 'uploader': email,
-                'created_at': date.today().isoformat()})
+                'created_at': date.today().isoformat()}
+            if ans_dst_name:
+                task['answer_pdf'] = 'inbox/' + ans_dst_name
+            bb.setdefault('task_pool', []).append(task)
             bb.setdefault('notes', []).append({
                 'at': date.today().isoformat(), 'from': 'boss',
                 'text': '用户上传 U-%d 自动解析未过，转人工处理：%s（%s）'
@@ -568,6 +579,8 @@ def upload_pdf():
     f = request.files.get('file')
     if f is None or not (f.filename or '').lower().endswith('.pdf'):
         return jsonify({'ok': False, 'msg': '请选择 PDF 文件'}), 400
+    af = request.files.get('answer_file')
+    ans_name = af.filename if (af is not None and (af.filename or '').lower().endswith('.pdf')) else None
     category = (request.form.get('category') or 'zj-anquan').strip()
     if CATEGORIES and category not in {c['id'] for c in CATEGORIES}:
         return jsonify({'ok': False, 'msg': '考试类别不正确'}), 400
@@ -582,16 +595,22 @@ def upload_pdf():
                         (email,)).fetchone()['c']
     if today_n >= DAILY_UPLOAD_LIMIT:
         return jsonify({'ok': False, 'msg': '今天上传次数已达上限（%d 套），明天再来' % DAILY_UPLOAD_LIMIT}), 429
-    cur = d.execute('INSERT INTO uploads(email, category, subject_title, title, filename, status)'
-                    ' VALUES (?, ?, ?, ?, ?, ?)',
-                    (email, category, subject_title, title, f.filename, 'parsing'))
+    cur = d.execute('INSERT INTO uploads(email, category, subject_title, title, filename, answer_filename, status)'
+                    ' VALUES (?, ?, ?, ?, ?, ?, ?)',
+                    (email, category, subject_title, title, f.filename, ans_name, 'parsing'))
     up_id = cur.lastrowid
     d.commit()
     pdf_path = os.path.join(UPLOAD_DIR, '%d.pdf' % up_id)
     f.save(pdf_path)
+    ans_path = None
+    if ans_name:
+        ans_path = os.path.join(UPLOAD_DIR, '%d_ans.pdf' % up_id)
+        af.save(ans_path)
     text = upload_lib.extract_text(pdf_path)
     if len(text.strip()) < 200:
         qs, warnings = [], ['未提取到文字层（可能是扫描版），转人工处理']
+    elif ans_path:
+        qs, warnings = upload_lib.parse_pair(text, upload_lib.extract_text(ans_path))
     else:
         qs, warnings = upload_lib.parse_text(text)
     if qs:
@@ -609,7 +628,8 @@ def upload_pdf():
         d.execute('UPDATE uploads SET status=?, summary=? WHERE id=?',
                   ('need_review', json.dumps(summary, ensure_ascii=False), up_id))
         status = 'need_review'
-        _pipeline_notify(up_id, pdf_path, f.filename, email, category, subject_title)
+        _pipeline_notify(up_id, pdf_path, f.filename, email, category, subject_title,
+                         ans_pdf=ans_path, ans_name=ans_name)
     d.commit()
     return jsonify({'ok': True, 'id': up_id, 'status': status, 'summary': summary})
 
@@ -618,7 +638,7 @@ def upload_pdf():
 def my_uploads():
     if not session.get('uid'):
         return jsonify({'ok': False, 'msg': '请先登录'}), 401
-    rows = db().execute('SELECT id, category, subject_title, title, filename, status, summary, set_id, created_at'
+    rows = db().execute('SELECT id, category, subject_title, title, filename, answer_filename, status, summary, set_id, created_at'
                         ' FROM uploads WHERE email=? ORDER BY id DESC LIMIT 50',
                         (session.get('email'),)).fetchall()
     out = []
@@ -683,6 +703,9 @@ def upload_discard(up_id):
         p = os.path.join(UPLOAD_DIR, '%d.%s' % (up_id, ext))
         if os.path.exists(p):
             os.remove(p)
+    p = os.path.join(UPLOAD_DIR, '%d_ans.pdf' % up_id)
+    if os.path.exists(p):
+        os.remove(p)
     return jsonify({'ok': True})
 
 

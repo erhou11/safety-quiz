@@ -6,6 +6,11 @@
 - 答案区每题以「N、答案：ABC」开头，其后为解析
 - 「单选题 / 多选题」标题行切换题型；最终题型以答案字母数校正（>1 为多选）
 
+试题与答案分开两个文件时（2026-10-26 起支持双文件上传）：
+- 试题 PDF 单独解析题目（可无答案分隔行）
+- 答案 PDF 除上面的块格式外，还支持紧凑答案表：
+  「1、A 2、AB 3、D」逐题式与「1—3 AAB」区间式
+
 解析质量不达标（无文字层、找不到题、缺答案比例过高）时返回空并给出原因，
 由调用方转人工审核（need_review），不硬凑。
 """
@@ -17,6 +22,8 @@ _Q_PAT = re.compile(r'^(\d{1,3})\s*[、.．]\s*(.+)$')
 _OPT_PAT = re.compile(r'^([A-E])\s*[.、．:：]\s*(.*)$')
 _ANS_PAT = re.compile(r'^(\d{1,3})\s*[、.．]\s*答案\s*[:：]\s*([A-E][A-E，,、\s]*)\s*(.*)$')
 _AD_PAT = re.compile(r'233网校|wx\.233\.com|全真机考|扫码|加微')
+_RANGE_PAT = re.compile(r'(\d{1,3})\s*[-—~～]\s*(\d{1,3})\s*[：:.、]?\s*([A-E]{2,})')
+_PAIR_PAT = re.compile(r'(\d{1,3})\s*[、.．:：]\s*([A-E]{1,6})(?![A-Za-z])')
 
 
 def extract_text(pdf_path):
@@ -37,15 +44,8 @@ def _clean(lines):
     return [l.rstrip() for l in lines if l.strip() and not _AD_PAT.search(l)]
 
 
-def parse_text(text):
-    """返回 (questions, warnings)。questions 元素与题库 JSON 同构（set/n 由调用方定）。"""
-    warnings = []
-    lines = _clean(text.splitlines())
-    split = next((i for i, l in enumerate(lines) if _SPLIT_PAT.match(l.strip())), None)
-    if split is None:
-        return [], ['未找到答案解析分隔行']
-    qlines, alines = lines[:split], lines[split + 1:]
-
+def _parse_questions(qlines):
+    """题面行 -> 题目列表（保留印刷题号 _pn，题型先按单选/多选标题行）。"""
     qs, cur, cur_opt, sect = [], None, None, 'single'
 
     def flush():
@@ -78,7 +78,11 @@ def parse_text(text):
         elif cur:
             cur['stem'] += l
     flush()
+    return qs
 
+
+def _parse_answer_blocks(alines):
+    """块格式答案区：「N、答案：ABC」开头、其后为解析 -> {题号: {answer, explanation}}"""
     ans = {}
     cur_n = None
     for raw in alines:
@@ -91,8 +95,32 @@ def parse_text(text):
             continue
         if cur_n is not None:
             ans[cur_n]['explanation'] = (ans[cur_n]['explanation'] + l).strip()
+    return ans
 
-    # 答案匹配：题面印刷题号全卷唯一时按题号对，否则按顺序对
+
+def _parse_answers_loose(text):
+    """独立答案文件的宽松解析：块格式优先（带解析），紧凑答案表补缺。
+
+    紧凑式：区间「1—3 AAB」（题量须与字母数对齐）、逐题「1、A 2、AB」。
+    """
+    ans = {}
+    flat = re.sub(r'\s+', ' ', text)
+    for m in _RANGE_PAT.finditer(flat):
+        a, b = int(m.group(1)), int(m.group(2))
+        letters = re.findall(r'[A-E]', m.group(3))
+        if 0 < b - a <= 200 and b - a + 1 == len(letters):
+            for i, ch in enumerate(letters):
+                ans.setdefault(a + i, {'answer': [ch], 'explanation': ''})
+    for m in _PAIR_PAT.finditer(flat):
+        n = int(m.group(1))
+        if n not in ans:
+            ans[n] = {'answer': re.findall(r'[A-E]', m.group(2)), 'explanation': ''}
+    ans.update(_parse_answer_blocks(_clean(text.splitlines())))
+    return ans
+
+
+def _finish(qs, ans, warnings):
+    """按题号/顺序把答案并入题目并过质量门（与原单文件逻辑一致）。"""
     pns = [q['_pn'] for q in qs]
     by_number = len(set(pns)) == len(pns)
     out = []
@@ -117,3 +145,35 @@ def parse_text(text):
     if len(no_ans) > max(1, len(out) // 5) or len(bad_opt) > max(1, len(out) // 5):
         return [], warnings + ['缺答案/选项异常比例过高，转人工']
     return out, warnings
+
+
+def parse_pair(q_text, a_text=None):
+    """试题文本 + 可选的独立答案文本 -> (questions, warnings)。
+
+    试题文本自带答案区时先用自带的，独立答案文件补缺（含解析）。
+    """
+    warnings = []
+    lines = _clean(q_text.splitlines())
+    split = next((i for i, l in enumerate(lines) if _SPLIT_PAT.match(l.strip())), None)
+    if split is not None:
+        qlines, embedded = lines[:split], lines[split + 1:]
+    else:
+        qlines, embedded = lines, []
+        if not a_text:
+            warnings.append('未找到答案解析分隔行')
+    qs = _parse_questions(qlines)
+    if not qs:
+        return [], ['未解析出任何题目']
+    ans = _parse_answer_blocks(embedded) if embedded else {}
+    if a_text:
+        for n, a in _parse_answers_loose(a_text).items():
+            if n not in ans or not ans[n].get('answer'):
+                ans[n] = a
+            elif not ans[n].get('explanation') and a.get('explanation'):
+                ans[n]['explanation'] = a['explanation']
+    return _finish(qs, ans, warnings)
+
+
+def parse_text(text):
+    """单文件解析（题面+答案同在一个 PDF）：parse_pair 的兼容入口。"""
+    return parse_pair(text, None)

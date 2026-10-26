@@ -674,7 +674,7 @@ async function loadMyUploads() {
     const st = UP_STATUS[r.status] || [r.status, ''];
     const div = document.createElement('div'); div.className = 'up-item';
     const sm = r.summary || {};
-    let meta = r.subject_title + ' · ' + (r.filename || '');
+    let meta = r.subject_title + ' · ' + (r.filename || '') + (r.answer_filename ? ' + 答案：' + r.answer_filename : '');
     if (r.status === 'ready' || r.status === 'done') meta += `<br>共 ${sm.total || 0} 题（单选 ${sm.single || 0} / 多选 ${sm.multi || 0}）`;
     if (sm.warnings && sm.warnings.length) meta += '<br>⚠ ' + sm.warnings.join('；');
     div.innerHTML = '<div class="up-t"></div><div class="up-m"></div>';
@@ -715,6 +715,8 @@ $('#up-submit').onclick = async () => {
   if (!file) { err.textContent = '请选择 PDF 文件'; return; }
   const fd = new FormData();
   fd.append('file', file);
+  const ansFile = $('#up-file-ans').files[0];
+  if (ansFile) fd.append('answer_file', ansFile);
   fd.append('category', $('#up-category').value);
   fd.append('subject_title', subject);
   fd.append('title', $('#up-title').value.trim());

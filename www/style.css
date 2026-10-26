@@ -180,3 +180,4 @@ body{background:#131417;color:#e8e6e1;font-family:-apple-system,BlinkMacSystemFo
 .start-card{border-color:rgba(201,162,75,.5);background:linear-gradient(180deg,#1e2027,#17181d);padding:20px 16px}
 .start-card .card-icon{background:linear-gradient(180deg,#ddbe68,#c9a24b)}
 .start-card .card-title{font-size:19px;font-weight:800;color:#dcb95e;letter-spacing:1px}
+.up-hint{color:#8a877f;font-size:12.5px;line-height:1.6;margin:6px 0 2px}
