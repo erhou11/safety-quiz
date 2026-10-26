@@ -181,3 +181,7 @@ body{background:#131417;color:#e8e6e1;font-family:-apple-system,BlinkMacSystemFo
 .start-card .card-icon{background:linear-gradient(180deg,#ddbe68,#c9a24b)}
 .start-card .card-title{font-size:19px;font-weight:800;color:#dcb95e;letter-spacing:1px}
 .up-hint{color:#8a877f;font-size:12.5px;line-height:1.6;margin:6px 0 2px}
+.up-notice{border:1px solid rgba(201,162,75,.45);background:rgba(201,162,75,.07);border-radius:12px;padding:12px 14px;margin:0 0 16px}
+.up-notice-t{color:#c9a24b;font-weight:700;font-size:14px;margin-bottom:6px}
+.up-notice p{color:#b9b6ac;font-size:13px;line-height:1.7;margin:0}
+.up-notice .up-live{color:#c9a24b;margin-top:8px;font-size:13px}

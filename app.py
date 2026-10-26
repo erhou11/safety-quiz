@@ -634,17 +634,38 @@ def upload_pdf():
     return jsonify({'ok': True, 'id': up_id, 'status': status, 'summary': summary})
 
 
+@app.get('/api/upload_info')
+def upload_info():
+    """上传页温馨提示用的实时信息：人工审核排队总数 + 本人今日已用额度。"""
+    if not session.get('uid'):
+        return jsonify({'ok': False, 'msg': '请先登录'}), 401
+    d = db()
+    queue_total = d.execute("SELECT COUNT(*) AS c FROM uploads WHERE status='need_review'").fetchone()['c']
+    today_used = d.execute("SELECT COUNT(*) AS c FROM uploads WHERE email=? AND date(created_at)=date('now')",
+                           (session.get('email'),)).fetchone()['c']
+    return jsonify({'ok': True, 'queue_total': queue_total, 'today_used': today_used,
+                    'daily_limit': DAILY_UPLOAD_LIMIT})
+
+
 @app.get('/api/my_uploads')
 def my_uploads():
     if not session.get('uid'):
         return jsonify({'ok': False, 'msg': '请先登录'}), 401
-    rows = db().execute('SELECT id, category, subject_title, title, filename, answer_filename, status, summary, set_id, created_at'
+    d = db()
+    queue_ids = [r['id'] for r in d.execute(
+        "SELECT id FROM uploads WHERE status='need_review' ORDER BY id").fetchall()]
+    queue_pos = {qid: i for i, qid in enumerate(queue_ids)}
+    rows = d.execute('SELECT id, category, subject_title, title, filename, answer_filename, status, summary, set_id, created_at'
                         ' FROM uploads WHERE email=? ORDER BY id DESC LIMIT 50',
                         (session.get('email'),)).fetchall()
     out = []
     for r in rows:
         item = dict(r)
         item['summary'] = json.loads(item['summary'] or '{}')
+        if item['status'] == 'need_review' and item['id'] in queue_pos:
+            ahead = queue_pos[item['id']]
+            item['queue_ahead'] = ahead
+            item['eta_hours'] = min(72, (ahead + 1) * 12)
         out.append(item)
     return jsonify(out)
 

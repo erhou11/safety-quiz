@@ -651,6 +651,15 @@ function renderUpload() {
   });
   fillSubjectList();
   loadMyUploads();
+  // 温馨提示的实时行：当前排队总数 + 本人今日额度
+  api('upload_info').then(info => {
+    const el = $('#up-live');
+    if (!el || !info || !info.ok) return;
+    const queue = info.queue_total > 0
+      ? `当前有 ${info.queue_total} 套正在排队等待人工审核`
+      : '当前没有排队，上传后很快就能处理';
+    el.textContent = `${queue} · 您今日已上传 ${info.today_used} / ${info.daily_limit} 套`;
+  }).catch(() => {});
 }
 function fillSubjectList() {
   // 科目/专业改为下拉选择：选项随上面选的考试类别自动匹配（规范清单来自 /api/meta）
@@ -677,6 +686,8 @@ async function loadMyUploads() {
     let meta = r.subject_title + ' · ' + (r.filename || '') + (r.answer_filename ? ' + 答案：' + r.answer_filename : '');
     if (r.status === 'ready' || r.status === 'done') meta += `<br>共 ${sm.total || 0} 题（单选 ${sm.single || 0} / 多选 ${sm.multi || 0}）`;
     if (sm.warnings && sm.warnings.length) meta += '<br>⚠ ' + sm.warnings.join('；');
+    if (r.status === 'need_review' && typeof r.queue_ahead === 'number')
+      meta += `<br>⏳ 人工审核排队中：前面还有 ${r.queue_ahead} 套，预计约 ${r.eta_hours} 小时内完成`;
     div.innerHTML = '<div class="up-t"></div><div class="up-m"></div>';
     div.querySelector('.up-t').innerHTML = '';
     div.querySelector('.up-t').textContent = r.title;

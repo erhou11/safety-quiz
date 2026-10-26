@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>注册安全工程师刷题</title>
 <link rel="icon" href="data:,">
-<link rel="stylesheet" href="style.css?v=31">
+<link rel="stylesheet" href="style.css?v=32">
 </head>
 <body>
 <div id="app">
@@ -109,6 +109,11 @@
     <div class="auth-card up-card">
       <h2 class="up-h">上传题库 PDF</h2>
       <p class="auth-tip">上传带答案的试卷 PDF，系统自动解析成一套题，只有你自己能见；满 1 年后进入公共题库免费开放。扫描版或解析失败的会转人工审核。</p>
+      <div class="up-notice">
+        <div class="up-notice-t">温馨提示</div>
+        <p>本服务免费提供，因算力有限，人员较多时需要排队等候。自动解析一般几分钟内完成；需要人工审核的套题会按提交顺序处理，排队位置和预计等待时间会显示在下方「我的上传」里。为节省资源，每位用户每天最多上传 5 套。</p>
+        <p class="up-live" id="up-live"></p>
+      </div>
       <label class="up-label">考试类别</label>
       <select id="up-category"></select>
       <label class="up-label">科目 / 专业</label>
@@ -183,6 +188,6 @@
     </div>
   </section>
 </div>
-<script src="app.js?v=38"></script>
+<script src="app.js?v=39"></script>
 </body>
 </html>
