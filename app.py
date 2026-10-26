@@ -1085,7 +1085,7 @@ def upload_confirm(up_id):
             return jsonify({'ok': True, 'set': sid, 'total': len(ORDERS.get(sid, [])),
                             'alias_of': source_id, 'reused': True})
         new_set = {'id': sid, 'subject': subject['id'], 'title': row['title'],
-                   'kicker': '题库引用', 'desc': '与题库已有套题内容相同，引用已有题目，不重复入库。',
+                   'kicker': '用户上传', 'desc': '',
                    'category': category, 'owner_email': row['email'],
                    'created_at': date.today().isoformat(), 'visibility': 'private',
                    'alias_of': source_id}
