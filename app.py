@@ -1,9 +1,10 @@
 """安全生产技术刷题 App 后端：Flask + SQLite，题目作答/进度/错题全部服务端持久化。
 支持多套题：每套题独立的进度、随机顺序与错题本。"""
-import json, os, re, sqlite3, secrets, random, shutil, threading
+import json, os, re, sqlite3, secrets, random, shutil, threading, hashlib
 from datetime import timedelta, date
 from flask import Flask, request, jsonify, session, g
 from werkzeug.security import generate_password_hash, check_password_hash
+from collections import Counter
 import upload_lib
 EMAIL_RE = re.compile(r'^[^@\s]+@[^@\s]+\.[^@\s]+$')
 
@@ -74,15 +75,51 @@ def _category_subjects():
         out[cid] = titles
     return out
 def _build_indexes():
-    """由 _data 重建套题/题目索引（启动加载与热重读共用）。"""
+    """由 _data 重建套题/题目索引（启动加载与热重读共用）。
+
+    引用型套题（alias_of）不重复保存题目：索引层把源套题的题目映射到引用套的
+    set id 下，磁盘 questions 里始终只有一份。源套题的作答进度仍按引用套 id
+    独立记录，互不影响。
+    """
     global SET_MAP, QUESTIONS, SET_IDS, ORDERS
     SET_MAP = {s['id']: s for s in SETS}
     QUESTIONS = {}
     for q in _data['questions']:
         QUESTIONS['%s:%d' % (q['set'], q['n'])] = q
     SET_IDS = [s['id'] for s in SETS]
-    ORDERS = {sid: sorted(int(k.split(':')[1]) for k in QUESTIONS if k.startswith(sid + ':'))
-              for sid in SET_IDS}
+    ORDERS = {}
+    for sid in SET_IDS:
+        ORDERS[sid] = sorted(int(k.split(':')[1]) for k in QUESTIONS
+                             if k.startswith(sid + ':'))
+    pending = [s for s in SETS if s.get('alias_of')]
+    while pending:
+        progressed = False
+        for s in list(pending):
+            src = s.get('alias_of')
+            if src in ORDERS and ORDERS[src] and '%s:%d' % (src, ORDERS[src][0]) in QUESTIONS:
+                for n in ORDERS[src]:
+                    QUESTIONS['%s:%d' % (s['id'], n)] = QUESTIONS['%s:%d' % (src, n)]
+                ORDERS[s['id']] = list(ORDERS[src])
+                pending.remove(s)
+                progressed = True
+        if not progressed:
+            break
+
+
+def _canonical_set_id(sid):
+    """沿 alias_of 链找到真正存题目的源套题 id（防链环）。"""
+    seen = set()
+    cur = sid
+    while cur in SET_MAP and SET_MAP[cur].get('alias_of') and cur not in seen:
+        seen.add(cur)
+        cur = SET_MAP[cur]['alias_of']
+    return cur
+
+
+def _set_questions(sid):
+    """按套题顺序取题目；引用型套题返回源套题的同一批题目对象。"""
+    return [QUESTIONS['%s:%d' % (sid, n)] for n in ORDERS.get(sid, [])
+            if '%s:%d' % (sid, n) in QUESTIONS]
 
 
 _build_indexes()
@@ -208,11 +245,13 @@ def init_db():
         category TEXT, subject_title TEXT, title TEXT, filename TEXT,
         status TEXT DEFAULT 'parsing',
         summary TEXT, set_id TEXT,
+        file_sha256 TEXT, answer_sha256 TEXT,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP);
     ''')
     _cols = [r[1] for r in d.execute('PRAGMA table_info(uploads)').fetchall()]
-    if _cols and 'answer_filename' not in _cols:
-        d.execute('ALTER TABLE uploads ADD COLUMN answer_filename TEXT')
+    for _col in ('answer_filename', 'file_sha256', 'answer_sha256'):
+        if _cols and _col not in _cols:
+            d.execute('ALTER TABLE uploads ADD COLUMN %s TEXT' % _col)
     # 迁移旧库：没有 set_id 列说明是旧表，重建（旧数据归为 s1）
     if not _has_col(d, 'answers', 'set_id'):
         _rebuild_with_set(d, 'answers', ['n', 'selected', 'correct', 'ts'], 'client, set_id, n')
@@ -341,10 +380,11 @@ def meta():
     for s in SETS:
         if not set_visible(s):
             continue
-        qs = [q for q in QUESTIONS.values() if q['set'] == s['id']]
+        qs = _set_questions(s['id'])
         out.append({'id': s['id'], 'title': s['title'], 'kicker': s['kicker'],
                     'subject': s.get('subject', 'jishu'), 'desc': s.get('desc', ''),
                     'category': s.get('category', 'zj-anquan'),
+                    'alias_of': s.get('alias_of'),
                     'visibility': s.get('visibility', 'public'),
                     'mine': bool(session.get('email')) and session.get('email') == s.get('owner_email'),
                     'total': len(qs),
@@ -677,6 +717,183 @@ def _my_upload(up_id):
                         (up_id, session.get('email'))).fetchone()
 
 
+def _sha256_file(path):
+    h = hashlib.sha256()
+    with open(path, 'rb') as fh:
+        for chunk in iter(lambda: fh.read(1024 * 1024), b''):
+            h.update(chunk)
+    return h.hexdigest()
+
+
+def _backfill_upload_hashes(exclude_up_id=None):
+    """给历史上传补算文件指纹（一次性效果：算过的行不再重算）。"""
+    d = db()
+    rows = d.execute('SELECT id FROM uploads WHERE file_sha256 IS NULL').fetchall()
+    changed = False
+    for r in rows:
+        if exclude_up_id is not None and r['id'] == exclude_up_id:
+            continue
+        qpath = os.path.join(UPLOAD_DIR, '%d.pdf' % r['id'])
+        if not os.path.exists(qpath):
+            continue
+        apath = os.path.join(UPLOAD_DIR, '%d_ans.pdf' % r['id'])
+        try:
+            d.execute('UPDATE uploads SET file_sha256=?, answer_sha256=? WHERE id=?',
+                      (_sha256_file(qpath),
+                       _sha256_file(apath) if os.path.exists(apath) else None,
+                       r['id']))
+            changed = True
+        except Exception:
+            continue
+    if changed:
+        d.commit()
+
+
+def _library_match_info(s, email):
+    """命中题库时的对外信息：公开套和本人套可报名字；他人私有套只报事实，
+    不泄露对方套题名称与所有者。"""
+    mine = bool(email) and s.get('owner_email') == email
+    vis = s.get('visibility', 'public')
+    return {'set_id': s['id'],
+            'title': s.get('title') if (vis == 'public' or mine) else None,
+            'visibility': vis,
+            'mine': mine,
+            'total': len(ORDERS.get(s['id'], [])),
+            'pct': 100,
+            'exact': True}
+
+
+def _exact_library_match(email, new_qs):
+    """解析后全题库查重：题目指纹多重集与某个非引用套题完全一致才算整套重复。
+
+    用多重集（Counter）而非集合：套内若有两道相同题，题量差异不能被集合吞掉。
+    命中后确认生成时只建引用套题，不再把题目重复写进题库。
+    """
+    try:
+        from dedup_check import fingerprint
+        new_counter = Counter(fingerprint(q) for q in new_qs)
+        if not new_counter:
+            return None
+        for s in SETS:
+            if s.get('alias_of'):
+                continue
+            qs = _set_questions(s['id'])
+            if len(qs) != len(new_qs):
+                continue
+            if Counter(fingerprint(q) for q in qs) == new_counter:
+                return _library_match_info(s, email)
+        return None
+    except Exception:
+        return None
+
+
+def _public_library_dup(email, new_qs):
+    """与公共题库高度相同（≥90%）但非整套完全一致时的提示；不拦、不自动引用。"""
+    try:
+        from dedup_check import fingerprint
+        new_fps = {fingerprint(q) for q in new_qs}
+        if not new_fps:
+            return None
+        best = None
+        for s in SETS:
+            if s.get('alias_of') or s.get('visibility', 'public') != 'public':
+                continue
+            if email and s.get('owner_email') == email:
+                continue
+            qs = _set_questions(s['id'])
+            if not qs:
+                continue
+            fps = {fingerprint(q) for q in qs}
+            ratio = len(new_fps & fps) / len(new_fps)
+            if ratio >= 0.9 and (best is None or ratio > best[0]):
+                best = (ratio, s)
+        if best is None:
+            return None
+        return {'set_id': best[1]['id'], 'title': best[1].get('title'),
+                'pct': round(best[0] * 100)}
+    except Exception:
+        return None
+
+
+def _find_file_reuse(up_id, q_hash, a_hash):
+    """上传前文件指纹复用：题目+答案两个 PDF 字节级完全相同才命中。
+
+    返回 ('library', 源套题id) 或 ('parse', 已解析题目列表) 或 None。
+    命中 library 时连题目都不用提取；命中 parse 时跳过提取与解析、复用解析结果。
+    """
+    _backfill_upload_hashes(exclude_up_id=up_id)
+    d = db()
+    rows = d.execute(
+        "SELECT * FROM uploads WHERE id<>? AND file_sha256=? "
+        "AND COALESCE(answer_sha256, '')=COALESCE(?, '') "
+        "AND status IN ('ready', 'done') "
+        "ORDER BY CASE WHEN status='done' THEN 0 ELSE 1 END, id",
+        (up_id, q_hash, a_hash)).fetchall()
+    for row in rows:
+        if row['set_id'] and row['set_id'] in SET_MAP:
+            root = _canonical_set_id(row['set_id'])
+            if _set_questions(root):
+                return ('library', root)
+    for row in rows:
+        p = os.path.join(UPLOAD_DIR, '%d.json' % row['id'])
+        if not os.path.exists(p):
+            continue
+        try:
+            with open(p, encoding='utf-8') as fh:
+                qs = json.load(fh)
+            if isinstance(qs, list) and qs:
+                return ('parse', qs)
+        except Exception:
+            continue
+    return None
+
+
+def _find_dup(email, new_qs, exclude_up_id=None):
+    """上传查重（2026-10-26 用户定）：新解析的题目与本人已有套题、本人其他待确认
+    上传逐题比指纹（口径同 dedup_check.fingerprint）；以新套题目数为分母，
+    重合 ≥90% 视为整套重复，返回重合最高的一条 {'title', 'pct'}，否则 None。
+    只提示不拦截；查重自身出错时返回 None，绝不影响上传主流程。"""
+    try:
+        from dedup_check import fingerprint
+        new_fps = {fingerprint(q) for q in new_qs}
+        if not new_fps:
+            return None
+        best = None  # (ratio, title)
+        for s in SETS:
+            if s.get('owner_email') != email:
+                continue
+            fps = {fingerprint(q) for q in _set_questions(s['id'])}
+            if not fps:
+                continue
+            ratio = len(new_fps & fps) / len(new_fps)
+            if ratio >= 0.9 and (best is None or ratio > best[0]):
+                best = (ratio, s.get('title') or s['id'])
+        try:
+            rows = db().execute("SELECT id, title FROM uploads WHERE email=? AND status='ready'",
+                                (email,)).fetchall()
+        except Exception:
+            rows = []  # DB 读失败只跳过待确认比对，不能连累已命中的套题结果
+        for r in rows:
+            if exclude_up_id is not None and r['id'] == exclude_up_id:
+                continue
+            try:
+                with open(os.path.join(UPLOAD_DIR, '%d.json' % r['id']), encoding='utf-8') as fh:
+                    other = json.load(fh)
+                fps = {fingerprint(q) for q in other}
+            except Exception:
+                continue
+            if not fps:
+                continue
+            ratio = len(new_fps & fps) / len(new_fps)
+            if ratio >= 0.9 and (best is None or ratio > best[0]):
+                best = (ratio, r['title'])
+        if best is None:
+            return None
+        return {'title': best[1], 'pct': round(best[0] * 100)}
+    except Exception:
+        return None
+
+
 @app.post('/api/upload')
 def upload_pdf():
     if not session.get('uid'):
@@ -712,20 +929,57 @@ def upload_pdf():
     if ans_name:
         ans_path = os.path.join(UPLOAD_DIR, '%d_ans.pdf' % up_id)
         af.save(ans_path)
-    text = upload_lib.extract_text(pdf_path)
-    if len(text.strip()) < 200:
-        qs, warnings = [], ['未提取到文字层（可能是扫描版），转人工处理']
-    elif ans_path:
-        qs, warnings = upload_lib.parse_pair(text, upload_lib.extract_text(ans_path))
+    q_hash = _sha256_file(pdf_path)
+    a_hash = _sha256_file(ans_path) if ans_path else None
+    d.execute('UPDATE uploads SET file_sha256=?, answer_sha256=? WHERE id=?',
+              (q_hash, a_hash, up_id))
+    d.commit()
+
+    # 先查文件指纹：同文件以前已解析/已成套的，直接复用，不再提取、不再解析。
+    qs, warnings = [], []
+    library_match = None
+    reused = None
+    reuse = _find_file_reuse(up_id, q_hash, a_hash)
+    if reuse and reuse[0] == 'library':
+        root = reuse[1]
+        qs = _set_questions(root)
+        library_match = _library_match_info(SET_MAP[root], email)
+        reused = {'kind': 'file_library', 'extraction_skipped': True}
+    elif reuse and reuse[0] == 'parse':
+        qs = reuse[1]
+        reused = {'kind': 'file_parse', 'extraction_skipped': True}
     else:
-        qs, warnings = upload_lib.parse_text(text)
+        text = upload_lib.extract_text(pdf_path)
+        if len(text.strip()) < 200:
+            qs, warnings = [], ['未提取到文字层（可能是扫描版），转人工处理']
+        elif ans_path:
+            qs, warnings = upload_lib.parse_pair(text, upload_lib.extract_text(ans_path))
+        else:
+            qs, warnings = upload_lib.parse_text(text)
+
     if qs:
-        with open(os.path.join(UPLOAD_DIR, '%d.json' % up_id), 'w', encoding='utf-8') as fh:
-            json.dump(qs, fh, ensure_ascii=False)
+        if library_match is None:
+            # 解析结果先落 staging JSON（确认生成引用套时不会写入题库，仅作兜底），
+            # 再和全题库做整套查重：完全一致就走引用，不重复入库。
+            with open(os.path.join(UPLOAD_DIR, '%d.json' % up_id), 'w', encoding='utf-8') as fh:
+                json.dump(qs, fh, ensure_ascii=False)
+            library_match = _exact_library_match(email, qs)
         summary = {'total': len(qs),
                    'single': sum(1 for q in qs if q['type'] == 'single'),
                    'multi': sum(1 for q in qs if q['type'] == 'multi'),
+                   'essay': sum(1 for q in qs if q['type'] == 'essay'),
                    'warnings': warnings}
+        if reused:
+            summary['reused'] = reused
+        if library_match:
+            summary['library_match'] = library_match
+        else:
+            dup = _find_dup(email, qs, exclude_up_id=up_id)
+            if dup:
+                summary['dup'] = dup
+            library_dup = _public_library_dup(email, qs)
+            if library_dup:
+                summary['library_dup'] = library_dup
         d.execute('UPDATE uploads SET status=?, summary=? WHERE id=?',
                   ('ready', json.dumps(summary, ensure_ascii=False), up_id))
         status = 'ready'
@@ -801,8 +1055,18 @@ def upload_confirm(up_id):
         return jsonify({'ok': False, 'msg': '记录不存在或无权操作'}), 404
     if row['status'] != 'ready':
         return jsonify({'ok': False, 'msg': '该上传不在待确认状态'}), 400
-    with open(os.path.join(UPLOAD_DIR, '%d.json' % up_id), encoding='utf-8') as fh:
-        parsed = json.load(fh)
+    try:
+        summary = json.loads(row['summary'] or '{}')
+    except Exception:
+        summary = {}
+    json_path = os.path.join(UPLOAD_DIR, '%d.json' % up_id)
+    source_id = (summary.get('library_match') or {}).get('set_id')
+    if source_id and source_id in SET_MAP:
+        source_id = _canonical_set_id(source_id)
+    elif source_id and not os.path.exists(json_path):
+        return jsonify({'ok': False, 'msg': '题库中的原套题已不存在，请重新上传'}), 409
+    else:
+        source_id = None
     category = row['category'] or 'zj-anquan'
     subject = next((s for s in SUBJECTS
                     if s.get('category', 'zj-anquan') == category and s['title'] == row['subject_title']), None)
@@ -811,6 +1075,30 @@ def upload_confirm(up_id):
                    'desc': '用户上传', 'category': category}
         SUBJECTS.append(subject)
     sid = 'up%d' % up_id
+    if source_id:
+        # 整套重复：只在用户名下新建一个引用套题，题目仍用题库里原套的，
+        # 不把题目再写进 questions_full.json。作答进度按这个新套题 id 独立记录。
+        if sid in SET_MAP:
+            d = db()
+            d.execute('UPDATE uploads SET status=?, set_id=? WHERE id=?', ('done', sid, up_id))
+            d.commit()
+            return jsonify({'ok': True, 'set': sid, 'total': len(ORDERS.get(sid, [])),
+                            'alias_of': source_id, 'reused': True})
+        new_set = {'id': sid, 'subject': subject['id'], 'title': row['title'],
+                   'kicker': '题库引用', 'desc': '与题库已有套题内容相同，引用已有题目，不重复入库。',
+                   'category': category, 'owner_email': row['email'],
+                   'created_at': date.today().isoformat(), 'visibility': 'private',
+                   'alias_of': source_id}
+        SETS.append(new_set)
+        _build_indexes()
+        _save_questions_data()
+        d = db()
+        d.execute('UPDATE uploads SET status=?, set_id=? WHERE id=?', ('done', sid, up_id))
+        d.commit()
+        return jsonify({'ok': True, 'set': sid, 'total': len(ORDERS.get(sid, [])),
+                        'alias_of': source_id, 'reused': True})
+    with open(json_path, encoding='utf-8') as fh:
+        parsed = json.load(fh)
     new_set = {'id': sid, 'subject': subject['id'], 'title': row['title'],
                'kicker': '用户上传', 'desc': '', 'category': category,
                'owner_email': row['email'], 'created_at': date.today().isoformat(),

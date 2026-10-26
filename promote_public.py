@@ -42,10 +42,16 @@ def main():
                 public_fps.add(fingerprint(q))
 
     promoted, skipped_all_dup, not_due, no_date = [], [], 0, 0
+    reference_sets = 0
     drop_ids = set()  # (set_id, id(q)) 待剔除题目的对象标识
 
     for s in d['sets']:
         if s.get('visibility', 'public') != 'private':
+            continue
+        if s.get('alias_of'):
+            # 引用型套题不存题目，只是用户名下的入口；源套题按自己的入库日期
+            # 独立转公开，引用套不重复转公开，避免公共库出现两套相同内容。
+            reference_sets += 1
             continue
         ca = s.get('created_at')
         if not ca:
@@ -94,8 +100,8 @@ def main():
         print('  转公开 %s《%s》：保留 %d 题，剔除重复 %d 题' % (sid, title, kept_n, dropped_n))
     for sid, title, total in skipped_all_dup:
         print('  跳过 %s《%s》：%d 题全部与公共库重复，未转公开' % (sid, title, total))
-    print('  未到期私有套 %d 个；缺 created_at 跳过 %d 个；本次共转公开 %d 套'
-          % (not_due, no_date, len(promoted)))
+    print('  未到期私有套 %d 个；缺 created_at 跳过 %d 个；引用型套题跳过 %d 个；本次共转公开 %d 套'
+          % (not_due, no_date, reference_sets, len(promoted)))
     return 0
 
 

@@ -731,6 +731,12 @@ async function loadMyUploads() {
     let meta = r.subject_title + ' · ' + (r.filename || '') + (r.answer_filename ? ' + 答案：' + r.answer_filename : '');
     if (r.status === 'ready' || r.status === 'done') meta += `<br>共 ${sm.total || 0} 题（单选 ${sm.single || 0} / 多选 ${sm.multi || 0}）`;
     if (sm.warnings && sm.warnings.length) meta += '<br>⚠ ' + sm.warnings.join('；');
+    if (sm.reused) meta += '<br>⚡ 已找到相同文件，直接复用了已有结果，本次没有重新提取';
+    if (sm.library_match) {
+      const t = sm.library_match.title ? '《' + String(sm.library_match.title).replace(/</g, '〈') + '》' : '题库里已有一套完全相同的内容';
+      meta += '<br>♻ ' + t + '；确认后只在你的题库里生成引用入口，题目直接用题库里的，不重复入库';
+    } else if (sm.dup) meta += '<br>⚠ 与你已有的《' + String(sm.dup.title).replace(/</g, '〈') + '》内容相同（重复 ' + sm.dup.pct + '%），生成后你的题库里会有两套一样的题';
+    if (sm.library_dup) meta += '<br>⚠ 与公共题库《' + String(sm.library_dup.title).replace(/</g, '〈') + '》高度相同（重复 ' + sm.library_dup.pct + '%），但不是整套完全一致，生成后仍会作为你的独立套题保存';
     if (r.status === 'need_review' && typeof r.queue_ahead === 'number')
       meta += `<br>⏳ 人工审核排队中：前面还有 ${r.queue_ahead} 套，预计约 ${r.eta_hours} 小时内完成${r.is_vip ? ' · 贵宾优先' : ''}`;
     div.innerHTML = '<div class="up-t"></div><div class="up-m"></div>';
@@ -741,13 +747,33 @@ async function loadMyUploads() {
     div.querySelector('.up-m').innerHTML = meta;
     const acts = document.createElement('div'); acts.className = 'up-actions';
     if (r.status === 'ready') {
-      const b1 = document.createElement('button'); b1.textContent = '生成套题';
+      const b1 = document.createElement('button'); b1.textContent = sm.library_match ? '生成引用套题' : '生成套题';
       b1.onclick = async () => {
         const res = await api('upload/' + r.id + '/confirm', { method: 'POST' });
-        if (res.ok) { alert('已生成套题（仅你可见），共 ' + res.total + ' 题'); loadMyUploads(); }
+        if (res.ok) {
+          alert(res.alias_of ? '已在你的题库里生成引用套题（仅你可见），共 ' + res.total + ' 题；题目来自题库已有内容，没有重复入库' : '已生成套题（仅你可见），共 ' + res.total + ' 题');
+          loadMyUploads();
+        }
         else alert(res.msg || '生成失败');
       };
       acts.appendChild(b1);
+    }
+    if (r.status === 'done' && r.set_id) {
+      const bOpen = document.createElement('button'); bOpen.textContent = '打开套题'; bOpen.className = 'ghost';
+      bOpen.onclick = async () => {
+        curSet = r.set_id;
+        localStorage.setItem('quiz_set', curSet);
+        await loadHome();
+        const s = setsMeta.find(x => x.id === curSet);
+        if (s) {
+          curCategory = s.category || curCategory;
+          curSubject = s.subject || curSubject;
+          localStorage.setItem('quiz_category', curCategory);
+          localStorage.setItem('quiz_subject', curSubject);
+        }
+        show('set'); renderSetPage();
+      };
+      acts.appendChild(bOpen);
     }
     if (r.status === 'ready' || r.status === 'need_review') {
       const b2 = document.createElement('button'); b2.textContent = '放弃'; b2.className = 'ghost';
@@ -782,7 +808,11 @@ $('#up-submit').onclick = async () => {
     const res = await r.json();
     if (!res.ok) { err.textContent = res.msg || '上传失败'; return; }
     $('#up-reward').classList.remove('hidden');
-    if (res.status === 'ready') alert('解析完成：共 ' + res.summary.total + ' 题，请在下方「我的上传」里确认生成套题');
+    if (res.status === 'ready') {
+      if (res.summary.library_match) alert('题库已有完全相同的套题：共 ' + res.summary.total + ' 题。本次不会重复提取入库，请在下方确认生成引用套题');
+      else if (res.summary.reused) alert('已找到相同文件，直接复用了已有解析结果：共 ' + res.summary.total + ' 题，请在下方「我的上传」里确认生成套题');
+      else alert('解析完成：共 ' + res.summary.total + ' 题，请在下方「我的上传」里确认生成套题');
+    }
     else alert('这份 PDF 没能自动解析，已转人工审核，处理完会出现在你的上传列表里');
     loadMyUploads();
   } catch (e) { err.textContent = '网络异常，请稍后重试'; }
