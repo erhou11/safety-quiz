@@ -13,6 +13,12 @@
 
 解析质量不达标（无文字层、找不到题、缺答案比例过高）时返回空并给出原因，
 由调用方转人工审核（need_review），不硬凑。
+
+复核步骤（2026-10-26 用户定）：第一遍解析只要出现提示性错误（缺答案 /
+选项数异常），不立即下结论——先用严格模式（题号顺序锚定 + 选项顺序锚定）
+按原卷重解析一遍，取问题更少的结果为准；仍修不好的才保留警告转人工。
+起因：某 106 题消防卷因页脚广告行与「B 」空格标号变体被拆成 110 题、
+答案错位，复核模式可完整还原。
 """
 import re
 
@@ -20,8 +26,9 @@ _SPLIT_PAT = re.compile(r'^(答案解析|参考答案|答案与解析|答案及�
 _SECT_PAT = re.compile(r'(单选|多选)题')
 _Q_PAT = re.compile(r'^(\d{1,3})\s*[、.．]\s*(.+)$')
 _OPT_PAT = re.compile(r'^([A-E])\s*[.、．:：]\s*(.*)$')
+_OPT_SPACE_PAT = re.compile(r'^([A-E])\s+(\S.*)$')
 _ANS_PAT = re.compile(r'^(\d{1,3})\s*[、.．]\s*答案\s*[:：]\s*([A-E][A-E，,、\s]*)\s*(.*)$')
-_AD_PAT = re.compile(r'233网校|wx\.233\.com|全真机考|扫码|加微')
+_AD_PAT = re.compile(r'233网校|wx\.233\.com|全真机考|扫码|加微|联系电话|联系地址|合作微信|顶级课程|核心押题')
 _RANGE_PAT = re.compile(r'(\d{1,3})\s*[-—~～]\s*(\d{1,3})\s*[：:.、]?\s*([A-E]{2,})')
 _PAIR_PAT = re.compile(r'(\d{1,3})\s*[、.．:：]\s*([A-E]{1,6})(?![A-Za-z])')
 
@@ -44,9 +51,17 @@ def _clean(lines):
     return [l.rstrip() for l in lines if l.strip() and not _AD_PAT.search(l)]
 
 
-def _parse_questions(qlines):
-    """题面行 -> 题目列表（保留印刷题号 _pn，题型先按单选/多选标题行）。"""
+def _parse_questions(qlines, strict=False):
+    """题面行 -> 题目列表（保留印刷题号 _pn，题型先按单选/多选标题行）。
+
+    strict=True 为复核模式：题号必须严格顺序递增才认作新题（防选项续行里
+    的「2.50h」类数字被误当题号拆题），选项字母也须按 A→E 顺序出现。
+    两种模式都允许「B 屋顶…」这种字母后空格的标号变体（仅限非首个选项，
+    且必须是期待的下一个字母，避免题干续行以字母开头时误判）。
+    """
     qs, cur, cur_opt, sect = [], None, None, 'single'
+    next_n = None
+    next_opt = 'A'
 
     def flush():
         nonlocal cur, cur_opt
@@ -62,16 +77,25 @@ def _parse_questions(qlines):
             sect = 'multi' if m.group(1) == '多选' else 'single'
             continue
         m = _Q_PAT.match(l)
-        if m:
+        if m and (not strict or next_n is None or int(m.group(1)) == next_n):
             flush()
             cur = {'_pn': int(m.group(1)), 'type': sect, 'cat': '', 'stem': m.group(2),
                    'options': [], 'images': [], 'exp_images': [],
                    'case_bg': '', 'case_images': []}
+            next_n = int(m.group(1)) + 1
+            next_opt = 'A'
             continue
         m = _OPT_PAT.match(l)
-        if m and cur:
+        if m and cur and (not strict or m.group(1) == next_opt):
             cur_opt = {'text': m.group(2).strip()}
             cur['options'].append(cur_opt)
+            next_opt = chr(ord(m.group(1)) + 1)
+            continue
+        m = _OPT_SPACE_PAT.match(l)
+        if m and cur and cur_opt is not None and m.group(1) == next_opt:
+            cur_opt = {'text': m.group(2).strip()}
+            cur['options'].append(cur_opt)
+            next_opt = chr(ord(m.group(1)) + 1)
             continue
         if cur_opt is not None:
             cur_opt['text'] = (cur_opt['text'] + l).strip()
@@ -120,7 +144,7 @@ def _parse_answers_loose(text):
 
 
 def _finish(qs, ans, warnings):
-    """按题号/顺序把答案并入题目并过质量门（与原单文件逻辑一致）。"""
+    """按题号/顺序把答案并入题目并过质量门。返回 (题目, 警告, 问题题数)。"""
     pns = [q['_pn'] for q in qs]
     by_number = len(set(pns)) == len(pns)
     out = []
@@ -135,24 +159,27 @@ def _finish(qs, ans, warnings):
         out.append(q)
 
     if not out:
-        return [], ['未解析出任何题目']
+        return [], ['未解析出任何题目'], 999
     no_ans = [i + 1 for i, q in enumerate(out) if not q['answer']]
     bad_opt = [i + 1 for i, q in enumerate(out) if not (2 <= len(q['options']) <= 6)]
     if no_ans:
         warnings.append('第 %s 题缺答案' % ','.join(map(str, no_ans[:10])))
     if bad_opt:
         warnings.append('第 %s 题选项数异常' % ','.join(map(str, bad_opt[:10])))
+    flagged = len(no_ans) + len(bad_opt)
     if len(no_ans) > max(1, len(out) // 5) or len(bad_opt) > max(1, len(out) // 5):
-        return [], warnings + ['缺答案/选项异常比例过高，转人工']
-    return out, warnings
+        return [], warnings + ['缺答案/选项异常比例过高，转人工'], flagged
+    return out, warnings, flagged
 
 
 def parse_pair(q_text, a_text=None):
     """试题文本 + 可选的独立答案文本 -> (questions, warnings)。
 
     试题文本自带答案区时先用自带的，独立答案文件补缺（含解析）。
+    第一遍出现提示性错误（缺答案 / 选项数异常）时不下结论：用严格顺序
+    锚定模式按原卷复核重解析，问题更少才采纳复核结果（见模块头注释）。
     """
-    warnings = []
+    base = []
     lines = _clean(q_text.splitlines())
     split = next((i for i, l in enumerate(lines) if _SPLIT_PAT.match(l.strip())), None)
     if split is not None:
@@ -160,7 +187,7 @@ def parse_pair(q_text, a_text=None):
     else:
         qlines, embedded = lines, []
         if not a_text:
-            warnings.append('未找到答案解析分隔行')
+            base.append('未找到答案解析分隔行')
     qs = _parse_questions(qlines)
     if not qs:
         return [], ['未解析出任何题目']
@@ -171,7 +198,19 @@ def parse_pair(q_text, a_text=None):
                 ans[n] = a
             elif not ans[n].get('explanation') and a.get('explanation'):
                 ans[n]['explanation'] = a['explanation']
-    return _finish(qs, ans, warnings)
+
+    def fresh(parsed):
+        return [dict(q, options=list(q['options'])) for q in parsed]
+
+    out, warnings, flagged = _finish(fresh(qs), ans, list(base))
+    flagged_warn = any('缺答案' in w or '选项数异常' in w for w in warnings)
+    if flagged_warn or not out:
+        qs2 = _parse_questions(qlines, strict=True)
+        if qs2:
+            out2, warnings2, flagged2 = _finish(fresh(qs2), ans, list(base))
+            if out2 and (not out or flagged2 < flagged):
+                out, warnings = out2, warnings2
+    return out, warnings
 
 
 def parse_text(text):
