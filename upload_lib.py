@@ -28,7 +28,7 @@ _Q_PAT = re.compile(r'^(\d{1,3})\s*[、.．]\s*(.+)$')
 _OPT_PAT = re.compile(r'^([A-E])\s*[.、．:：]\s*(.*)$')
 _OPT_SPACE_PAT = re.compile(r'^([A-E])\s+(\S.*)$')
 _ANS_PAT = re.compile(r'^(\d{1,3})\s*[、.．]\s*答案\s*[:：]\s*([A-E][A-E，,、\s]*)\s*(.*)$')
-_AD_PAT = re.compile(r'233网校|wx\.233\.com|全真机考|扫码|加微|联系电话|联系地址|合作微信|顶级课程|核心押题')
+_AD_PAT = re.compile(r'233网校|wx\.233\.com|全真机考|扫码|加微|联系电话|联系地址|合作微信|顶级课程|核心押题|睿和中心|0\d{2,3}-\d{7,8}')
 _RANGE_PAT = re.compile(r'(\d{1,3})\s*[-—~～]\s*(\d{1,3})\s*[：:.、]?\s*([A-E]{2,})')
 _PAIR_PAT = re.compile(r'(\d{1,3})\s*[、.．:：]\s*([A-E]{1,6})(?![A-Za-z])')
 
@@ -105,8 +105,18 @@ def _parse_questions(qlines, strict=False):
     return qs
 
 
+_ANS2_PAT = re.compile(r'^(\d{1,3})\s*[、.．]\s*([A-E]{1,6})\s*(?:解析\s*[:：]\s*(.*))?$')
+_EXP_HEAD_PAT = re.compile(r'^解析\s*[:：]\s*(.*)$')
+
+
 def _parse_answer_blocks(alines):
-    """块格式答案区：「N、答案：ABC」开头、其后为解析 -> {题号: {answer, explanation}}"""
+    """块格式答案区 -> {题号: {answer, explanation}}。
+
+    两种版式：
+    - 「N、答案：ABC」开头（_ANS_PAT），其后为解析；
+    - 紧凑版式（破题类答案册）：「N. ABC」单独成行，其后「解析：…」；
+      「解析」可与题号同行（「208.D解析：…」），也可单独成行。
+    """
     ans = {}
     cur_n = None
     for raw in alines:
@@ -117,7 +127,18 @@ def _parse_answer_blocks(alines):
             ans[cur_n] = {'answer': re.findall(r'[A-E]', m.group(2)),
                           'explanation': m.group(3).strip()}
             continue
+        m = _ANS2_PAT.match(l)
+        if m:
+            cur_n = int(m.group(1))
+            ans[cur_n] = {'answer': re.findall(r'[A-E]', m.group(2)),
+                          'explanation': (m.group(3) or '').strip()}
+            continue
         if cur_n is not None:
+            em = _EXP_HEAD_PAT.match(l)
+            if em:
+                l = em.group(1).strip()
+                if not l:
+                    continue
             ans[cur_n]['explanation'] = (ans[cur_n]['explanation'] + l).strip()
     return ans
 
