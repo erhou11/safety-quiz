@@ -1,6 +1,6 @@
 """安全生产技术刷题 App 后端：Flask + SQLite，题目作答/进度/错题全部服务端持久化。
 支持多套题：每套题独立的进度、随机顺序与错题本。"""
-import json, os, re, sqlite3, secrets, random, shutil
+import json, os, re, sqlite3, secrets, random, shutil, threading
 from datetime import timedelta, date
 from flask import Flask, request, jsonify, session, g
 from werkzeug.security import generate_password_hash, check_password_hash
@@ -73,13 +73,53 @@ def _category_subjects():
                 titles.append(s['title'])
         out[cid] = titles
     return out
-SET_MAP = {s['id']: s for s in SETS}
-QUESTIONS = {}
-for q in _data['questions']:
-    QUESTIONS['%s:%d' % (q['set'], q['n'])] = q
-SET_IDS = [s['id'] for s in SETS]
-ORDERS = {sid: sorted(int(k.split(':')[1]) for k in QUESTIONS if k.startswith(sid + ':'))
-          for sid in SET_IDS}
+def _build_indexes():
+    """由 _data 重建套题/题目索引（启动加载与热重读共用）。"""
+    global SET_MAP, QUESTIONS, SET_IDS, ORDERS
+    SET_MAP = {s['id']: s for s in SETS}
+    QUESTIONS = {}
+    for q in _data['questions']:
+        QUESTIONS['%s:%d' % (q['set'], q['n'])] = q
+    SET_IDS = [s['id'] for s in SETS]
+    ORDERS = {sid: sorted(int(k.split(':')[1]) for k in QUESTIONS if k.startswith(sid + ':'))
+              for sid in SET_IDS}
+
+
+_build_indexes()
+
+# ---- 题库文件变更自动重读（2026-10-26 方案A）----
+# 题库数据在每个 gunicorn worker 内存里各一份：upload_confirm 只更新处理该请求的
+# worker 并写盘，其余 worker 不重读就会不认识新套题（req_set 静默回退 s1=85 题）。
+# 每个请求前比对 questions_full.json 的修改时间，变了就整体重读对齐，无需重启服务。
+DATA_FILE = os.path.join(BASE, 'questions_full.json')
+_seen_mtime = os.path.getmtime(DATA_FILE)
+_reload_lock = threading.Lock()
+
+
+def _maybe_reload():
+    global _seen_mtime, _data, SETS, SUBJECTS, CATEGORIES
+    try:
+        mt = os.path.getmtime(DATA_FILE)
+    except OSError:
+        return
+    if mt == _seen_mtime:
+        return
+    with _reload_lock:
+        if mt == _seen_mtime:
+            return
+        try:
+            with open(DATA_FILE, encoding='utf-8') as f:
+                fresh = json.load(f)
+        except Exception:
+            return  # 读失败（多为文件正被原子替换的瞬间）：保留旧数据，下个请求再试
+        _data = fresh
+        SETS = _data['sets']
+        SUBJECTS = _data.get('subjects', [])
+        CATEGORIES = _data.get('categories', [])
+        for _s in SUBJECTS:
+            _s.setdefault('category', 'zj-anquan')
+        _build_indexes()
+        _seen_mtime = mt
 
 app = Flask(__name__)
 sk_file = os.path.join(BASE, 'secret.key')
@@ -91,6 +131,11 @@ with open(sk_file, 'rb') as f:
 app.config['SESSION_COOKIE_HTTPONLY'] = True
 app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
 app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=30)
+
+
+@app.before_request
+def _sync_questions_data():
+    _maybe_reload()
 
 
 def db():
