@@ -210,3 +210,6 @@ body{background:#131417;color:#e8e6e1;font-family:-apple-system,BlinkMacSystemFo
 .rw-gold{color:#dcbc65;font-weight:700}
 .reward-imgs span{color:#e8e4da;font-size:13.5px;font-weight:600;letter-spacing:3px;margin-top:9px}
 .reward-s{color:#7c7f88;font-size:11.5px;letter-spacing:1px;margin-top:10px}
+
+/* 打赏模块统一标准（以完成页样式为准，两处共用）：金色渐变边框面板 */
+.reward{border-top:none;background:linear-gradient(#17181b,#17181b) padding-box,linear-gradient(135deg,rgba(201,162,75,.65),rgba(201,162,75,.12)) border-box;border:1px solid transparent;border-radius:16px;padding:16px 14px 12px}
