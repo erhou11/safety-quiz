@@ -988,6 +988,13 @@ def upload_pdf():
         if still_empty:
             warnings.append('第 %s 题解析为空：已按原文件逐页核对文字与图/表仍未找到，转人工核对'
                             % ','.join(map(str, still_empty[:10])))
+        # 第一遍解析的警告若已被后续修复（选项拆回/答案补齐）解决，删掉防误报；
+        # 没解决的由体检翻译在下面按最终结果重报。
+        _blk = audit.get('blocking') or {}
+        if not _blk.get('bad_options'):
+            warnings = [w for w in warnings if '选项数异常' not in w]
+        if not _blk.get('no_answer'):
+            warnings = [w for w in warnings if '缺答案' not in w]
         # 成套体检结果翻译成用户能看懂的警告；阻断项在下方硬门禁处整套拦下。
         _AUDIT_LABEL = {'no_answer': '缺答案', 'bad_options': '选项数异常',
                         'answer_out_of_range': '答案超出选项范围',
