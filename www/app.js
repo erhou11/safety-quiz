@@ -1,5 +1,50 @@
 const $ = s => document.querySelector(s);
 const LETTERS = 'ABCDEFGH';
+
+// 自制弹窗：替代浏览器原生 alert/confirm（原生弹窗标题固定是域名，改不了）。
+// 成功类提示的标题从激励文案池里取，用洗牌袋保证一整轮内不重复；
+// 失败/中性提示与确认框用固定标题「温馨提示」。
+const CHEERS = [
+  '成功上岸，记得回来打赏哦',
+  '稳住，你离上岸又近了一步',
+  '今日宜刷题，上岸正当时',
+  '每一道题，都是上岸的台阶',
+  '乾坤未定，你我皆是黑马',
+  '刷过的题，都会变成底气',
+  '星光不负赶路人',
+  '坚持一下，上岸就在前面',
+  '上岸那天，记得回来报个喜',
+  '小步快跑，稳稳上岸'
+];
+let cheerBag = [];
+function nextCheer() {
+  if (!cheerBag.length) {
+    cheerBag = CHEERS.slice();
+    for (let i = cheerBag.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      const t = cheerBag[i]; cheerBag[i] = cheerBag[j]; cheerBag[j] = t;
+    }
+  }
+  return cheerBag.pop();
+}
+let dlgResolve = null;
+function showDlg(title, msg, withCancel) {
+  return new Promise(res => {
+    dlgResolve = res;
+    $('#dlg-title').textContent = title;
+    $('#dlg-msg').textContent = msg;
+    $('#dlg-cancel').classList.toggle('hidden', !withCancel);
+    $('#dlg-mask').classList.remove('hidden');
+  });
+}
+function closeDlg(v) {
+  $('#dlg-mask').classList.add('hidden');
+  if (dlgResolve) { const r = dlgResolve; dlgResolve = null; r(v); }
+}
+function appAlert(msg, cheer) { return showDlg(cheer === false ? '温馨提示' : nextCheer(), msg, false); }
+function appConfirm(msg) { return showDlg('温馨提示', msg, true); }
+$('#dlg-ok').onclick = () => closeDlg(true);
+$('#dlg-cancel').onclick = () => closeDlg(false);
 let mode = 'seq', order = [], pos = 0, roundMap = {}, t0 = 0, picked = [];
 let favSet = new Set();
 let curSet = localStorage.getItem('quiz_set') || 's1';
@@ -150,7 +195,7 @@ function renderSetTabs() {
       redo.className = 'st-redo'; redo.textContent = '重做';
       redo.onclick = async (e) => {
         e.stopPropagation();
-        if (!confirm('确定重做《' + s.title + '》？将清除本套全部作答记录。')) return;
+        if (!(await appConfirm('确定重做《' + s.title + '》？将清除本套全部作答记录。'))) return;
         await api('reset_set?set=' + s.id, { method: 'POST' });
         renderPractice();
       };
@@ -752,10 +797,10 @@ async function loadMyUploads() {
       b1.onclick = async () => {
         const res = await api('upload/' + r.id + '/confirm', { method: 'POST' });
         if (res.ok) {
-          alert('已生成套题（仅你可见），共 ' + res.total + ' 题');
+          appAlert('已生成套题（仅你可见），共 ' + res.total + ' 题');
           loadMyUploads();
         }
-        else alert(res.msg || '生成失败');
+        else appAlert(res.msg || '生成失败', false);
       };
       acts.appendChild(b1);
     }
@@ -779,11 +824,11 @@ async function loadMyUploads() {
     if (r.status === 'defect') {
       const bOk = document.createElement('button'); bOk.textContent = '已确认，题目无误';
       bOk.onclick = async () => {
-        if (!confirm('确认原文件题目无误？提交后我们会再复核一遍。')) return;
+        if (!(await appConfirm('确认原文件题目无误？提交后我们会再复核一遍。'))) return;
         const res = await api('upload/' + r.id + '/confirm_ok', { method: 'POST' });
-        if (res.ok && res.status === 'ready') alert('复核通过，已恢复为待确认生成');
-        else if (res.ok) alert('已提交站长终审');
-        else alert(res.msg || '提交失败');
+        if (res.ok && res.status === 'ready') appAlert('复核通过，已恢复为待确认生成');
+        else if (res.ok) appAlert('已提交站长终审');
+        else appAlert(res.msg || '提交失败', false);
         loadMyUploads();
       };
       acts.appendChild(bOk);
@@ -791,7 +836,7 @@ async function loadMyUploads() {
     if (r.status === 'ready' || r.status === 'need_review' || r.status === 'defect') {
       const b2 = document.createElement('button'); b2.textContent = r.status === 'defect' ? '放弃上传' : '放弃'; b2.className = 'ghost';
       b2.onclick = async () => {
-        if (!confirm('放弃这份上传？')) return;
+        if (!(await appConfirm('放弃这份上传？'))) return;
         await api('upload/' + r.id + '/discard', { method: 'POST' });
         loadMyUploads();
       };
@@ -856,9 +901,9 @@ $('#up-submit').onclick = async () => {
     if (!res.ok) { err.textContent = res.msg || '上传失败'; return; }
     $('#up-reward').classList.remove('hidden');
     if (res.status === 'ready') {
-      alert('解析完成：共 ' + res.summary.total + ' 题，请在下方「我的上传」里确认生成套题');
+      appAlert('解析完成：共 ' + res.summary.total + ' 题，请在下方「我的上传」里确认生成套题');
     }
-    else alert('这份 PDF 没能自动解析，已转人工审核，处理完会出现在你的上传列表里');
+    else appAlert('这份 PDF 没能自动解析，已转人工审核，处理完会出现在你的上传列表里', false);
     loadMyUploads();
   } catch (e) { err.textContent = '网络异常，请稍后重试'; }
   finally { $('#up-submit').disabled = false; }
