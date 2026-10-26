@@ -971,6 +971,14 @@ def upload_pdf():
         except Exception:
             pass
         still_empty = upload_lib.resolve_empty_explanations(qs)
+        filled_by_img = [i + 1 for i, q in enumerate(qs)
+                         if (q.get('explanation') or '').startswith('原书本题解析为图/表')]
+        if filled_by_img or still_empty:
+            # 解析一遍时的「解析为空」警告已被核原文件这一步取代，避免误报。
+            warnings = [w for w in warnings if '解析为空（原卷可能为图片表格' not in w]
+        if filled_by_img:
+            warnings.append('第 %s 题解析为图片表格，已从原文件提取图/表附上'
+                            % ','.join(map(str, filled_by_img[:10])))
         if still_empty:
             warnings.append('第 %s 题解析为空：已按原文件逐页核对文字与图/表仍未找到，转人工核对'
                             % ','.join(map(str, still_empty[:10])))
