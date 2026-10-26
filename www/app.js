@@ -50,6 +50,13 @@ function show(id) {
   document.querySelectorAll('.screen').forEach(e => e.classList.remove('active'));
   $('#screen-' + id).classList.add('active');
   window.scrollTo(0, 0);
+  // 把当前页面记进 URL hash，刷新后回到原页面，不再一律回首页；
+  // 答题页的 hash 是 #quiz=模式，由 setQuizHash 维护，这里不覆盖
+  try {
+    if (id === 'quiz') { if (!/#quiz=/.test(location.hash)) setQuizHash(mode); }
+    else if (id === 'home') history.replaceState(null, '', location.pathname + location.search);
+    else history.replaceState(null, '', '#page=' + id);
+  } catch (e) {}
 }
 async function api(p, o = {}) {
   const r = await fetch('/api/' + p, Object.assign({ headers: { 'Content-Type': 'application/json' } }, o));
@@ -795,15 +802,28 @@ $('#fs-dec').onclick = () => { if (fsIdx > 0) { fsIdx--; applyFs(); } };
 $('#fs-inc').onclick = () => { if (fsIdx < FS_LEVELS.length - 1) { fsIdx++; applyFs(); } };
 applyFs();
 
-// 页面加载：如果 URL 带有 #quiz=mode（刷新前正在答题），自动恢复到原页面原位置
+// 页面加载：按 URL hash 恢复刷新前的页面——#quiz=模式 回答题页原位置，
+// #page=页面 回对应页（完成页数据无法重建，刷新后回套题页），无 hash 则停在首页
 (async () => {
-  const hm = (location.hash || '').match(/quiz=(seq|rand|wrong|fav)/);
+  const hm = (location.hash || '').match(/quiz=(seq|rand|wrong|fav|essay)/);
+  const pm = (location.hash || '').match(/page=(practice|set|result|upload|auth)/);
   try { await loadHome(); }
   catch (e) { $('#set-desc').textContent = '服务连接失败，请稍后重试'; return; }
   if (hm) {
     const st = await api(withSet('state')).catch(() => null);
     const p = !st ? 0 : hm[1] === 'seq' ? st.seq_pos : hm[1] === 'rand' ? st.rand_pos : 0;
     startQuiz(hm[1], p);
+  } else if (pm) {
+    const page = pm[1];
+    if (page === 'practice') { show('practice'); renderPractice(); }
+    else if (page === 'set' || page === 'result') { show('set'); renderSetPage(); }
+    else if (page === 'upload') {
+      const me = await api('me').catch(() => null);
+      if (me && me.logged_in) { show('upload'); renderUpload(); }
+    } else if (page === 'auth') {
+      const me = await api('me').catch(() => null);
+      if (!me || !me.logged_in) { setAuthMode('login'); show('auth'); }
+    }
   }
 })();
 
