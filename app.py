@@ -456,8 +456,8 @@ def _donation_total(email):
 
 
 def _daily_limit(email):
-    """每日上传上限：普通 5 套；累计打赏 10 元以上（不含 10 元）20 套（2026-10-26 用户定）。"""
-    return 20 if _donation_total(email) > 10 else DAILY_UPLOAD_LIMIT
+    """每日上传上限：普通 5 套；累计打赏 10 元以上（含 10 元）20 套（2026-10-26 定，2026-10-27 改为含 10 元）。"""
+    return 20 if _donation_total(email) >= 10 else DAILY_UPLOAD_LIMIT
 
 
 _TIER_RANK = {'普通用户': 0, '青铜贵宾': 1, '白银贵宾': 2, '黄金贵宾': 3, '紫金贵宾': 4}
