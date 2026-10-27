@@ -882,10 +882,21 @@ async function _pickedFile(inputSel, key) {
 
 $('#up-submit').onclick = async () => {
   const err = $('#up-err'); err.textContent = '';
+  const btn = $('#up-submit');
+  const btnText = btn.textContent;
   const subject = $('#up-subject').value.trim();
   if (!subject) { err.textContent = '请选择科目 / 专业'; return; }
   if (!($('#up-file').files && $('#up-file').files[0])) { err.textContent = '请选择 PDF 文件'; return; }
-  $('#up-submit').disabled = true;
+  const mainFile = $('#up-file').files[0];
+  const ansFile = ($('#up-file-ans').files && $('#up-file-ans').files[0]) || null;
+  const totalSize = mainFile.size + (ansFile ? ansFile.size : 0);
+  if (totalSize > 100 * 1000 * 1000) {
+    err.textContent = '文件合计约 ' + (totalSize / 1000 / 1000).toFixed(1) + 'MB，超过 100MB 上限，请压缩或拆分后再上传';
+    return;
+  }
+  btn.disabled = true;
+  btn.textContent = '正在上传并解析，请稍候…';
+  err.textContent = '正在上传，文件越大等待越久，请不要重复点击';
   try {
     const main = await _pickedFile('#up-file', 'main');
     if (!main) { err.textContent = '请选择 PDF 文件'; return; }
@@ -897,8 +908,15 @@ $('#up-submit').onclick = async () => {
     fd.append('subject_title', subject);
     fd.append('title', $('#up-title').value.trim());
     const r = await fetch('/api/upload', { method: 'POST', body: fd });
-    const res = await r.json();
-    if (!res.ok) { err.textContent = res.msg || '上传失败'; return; }
+    const raw = await r.text();
+    let res = null;
+    try { res = JSON.parse(raw); } catch (e) {}
+    if (!r.ok || !res || !res.ok) {
+      if (r.status === 413) err.textContent = '文件超过 100MB 上限，请压缩或拆分后再上传';
+      else err.textContent = (res && res.msg) || '上传失败，请稍后重试';
+      return;
+    }
+    err.textContent = '';
     $('#up-reward').classList.remove('hidden');
     if (res.status === 'ready') {
       appAlert('解析完成：共 ' + res.summary.total + ' 题，请在下方「我的上传」里确认生成套题');
@@ -906,7 +924,7 @@ $('#up-submit').onclick = async () => {
     else appAlert('这份 PDF 没能自动解析，已转人工审核，处理完会出现在你的上传列表里', false);
     loadMyUploads();
   } catch (e) { err.textContent = '网络异常，请稍后重试'; }
-  finally { $('#up-submit').disabled = false; }
+  finally { btn.disabled = false; btn.textContent = btnText; }
 };
 
 // 答题字号调节（15/17/19/21 四档，记住选择）
