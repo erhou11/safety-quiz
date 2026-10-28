@@ -1038,7 +1038,7 @@ def upload_pdf():
     else:
         text = upload_lib.extract_text(pdf_path)
         if len(upload_lib.meaningful_text(text)) < 200:
-            qs, warnings = [], ['未提取到文字层（可能是扫描版），转人工处理']
+            qs, warnings = [], ['未提取到文字层（可能是图层版），转人工处理']
         elif ans_path:
             qs, warnings = upload_lib.parse_pair(text, upload_lib.extract_text(ans_path))
         else:
