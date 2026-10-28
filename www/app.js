@@ -777,7 +777,9 @@ async function loadMyUploads() {
     if (r.status === 'ready' || r.status === 'done') meta += `<br>共 ${sm.total || 0} 题（单选 ${sm.single || 0} / 多选 ${sm.multi || 0}）`;
     if (sm.warnings && sm.warnings.length) meta += '<br>⚠ ' + sm.warnings.join('；');
     if (r.status === 'need_review' && typeof r.queue_ahead === 'number')
-      meta += `<br>⏳ 人工审核排队中：前面还有 ${r.queue_ahead} 套，预计约 ${r.eta_hours} 小时内完成${r.is_vip ? ' · 贵宾优先' : ''}`;
+      meta += r.queue_ahead === 0
+        ? `<br>⏳ 正在人工审核中，预计约 ${r.eta_hours} 小时内完成${r.is_vip ? ' · 贵宾优先' : ''}`
+        : `<br>⏳ 人工审核排队中：前面还有 ${r.queue_ahead} 套，预计约 ${r.eta_hours} 小时内完成${r.is_vip ? ' · 贵宾优先' : ''}`;
     if (r.status === 'defect') {
       const ps = (r.problems && r.problems.length) ? r.problems : ['原文件有问题，详见审核结果'];
       meta += '<br>⚠ 审核发现这份卷子本身有问题，需要你确认：' + ps.map(p => '<br>· ' + p).join('');
