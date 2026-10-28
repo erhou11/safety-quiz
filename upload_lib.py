@@ -247,6 +247,16 @@ def parse_pair(q_text, a_text=None):
     return out, warnings
 
 
+def meaningful_text(text):
+    """去掉广告行（页眉水印、页脚）后剩下的正文。
+
+    扫描版 PDF 的文字层往往只剩卖家每页重复的广告水印：原始文字量过 200
+    字门槛、却一个字正文都没有。判断「有没有文字层」必须看清洗后的正文，
+    否则这类文件会被误报成「未解析出任何题目」而不是「扫描版转人工」。
+    """
+    return '\n'.join(_clean((text or '').splitlines())).strip()
+
+
 def parse_text(text):
     """单文件解析（题面+答案同在一个 PDF）：parse_pair 的兼容入口。"""
     return parse_pair(text, None)

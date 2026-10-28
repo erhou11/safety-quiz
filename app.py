@@ -757,7 +757,7 @@ def _reparse_stored_upload(row):
     if not os.path.exists(pdf_path):
         return False, {'total': 0, 'blocking': {'missing_file': []}}
     text = upload_lib.extract_text(pdf_path)
-    if len(text.strip()) < 200:
+    if len(upload_lib.meaningful_text(text)) < 200:
         return False, {'total': 0, 'blocking': {'no_text_layer': []}}
     if ans_path:
         qs, warnings = upload_lib.parse_pair(text, upload_lib.extract_text(ans_path))
@@ -1037,7 +1037,7 @@ def upload_pdf():
         reused = {'kind': 'file_parse', 'extraction_skipped': True}
     else:
         text = upload_lib.extract_text(pdf_path)
-        if len(text.strip()) < 200:
+        if len(upload_lib.meaningful_text(text)) < 200:
             qs, warnings = [], ['未提取到文字层（可能是扫描版），转人工处理']
         elif ans_path:
             qs, warnings = upload_lib.parse_pair(text, upload_lib.extract_text(ans_path))
