@@ -1198,7 +1198,7 @@ def my_uploads():
         if item['status'] == 'need_review' and item['id'] in queue_pos:
             ahead = queue_pos[item['id']]
             item['queue_ahead'] = ahead
-            item['eta_hours'] = min(72, (ahead + 1) * 12)
+            item['eta_hours'] = min(72, (ahead + 1) * 2)
             item['is_vip'] = _donation_total(session.get('email')) > 0
         out.append(item)
     return jsonify(out)
